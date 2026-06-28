@@ -13,12 +13,15 @@ async def extract_text_transference(txt: str) -> str:
     response = client.models.generate_content(
       model="gemini-2.5-flash",
       contents=(
-            f'A data de hoje é {today}. O usuário descreveu uma transação financeira '
-            f'em linguagem natural: "{txt}". '
-            'Extraia e responda APENAS com JSON: [{"data": "", "descricao": "", '
-            '"valor": 0.0, "tipo": "entrada|saida", "categoria": ""}]. '
+             f'A data de hoje é {today}. O usuário escreveu: "{txt}". '
+            'Responda APENAS com JSON neste formato: '
+            '{"e_transacao": true|false, "transacoes": [{"data": "", "descricao": "", '
+            '"valor": 0.0, "tipo": "entrada|saida", "categoria": ""}]}. '
+            'Marque "e_transacao" como false se a mensagem não descrever um gasto ou '
+            'recebimento (ex: saudação, pergunta, conversa solta). Nesse caso, '
+            '"transacoes" deve ser uma lista vazia. '
             "Se não houver data explícita na mensagem, use a data de hoje."
-      ),
+              ),
       config=types.GenerateContentConfig(response_mime_type="application/json"),
     )
     
