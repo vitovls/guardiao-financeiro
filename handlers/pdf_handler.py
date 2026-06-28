@@ -1,3 +1,5 @@
+import os
+
 from telegram import Update
 
 from services.message_service import formatter_message, split_message
@@ -13,7 +15,11 @@ async def get_pdf(update: Update, context):
     await update.message.reply_text("...")
     await file_pdf.download_to_drive(path_pdf)
 
-    transactions = await extract_photo_data(path_pdf)
+    try:
+        transactions = await extract_photo_data(path_pdf)
+    finally:
+        os.remove(path_pdf)
+
     await salvar_transacoes(transactions, usuario_id)
     msg = formatter_message(transactions)
     for block in split_message(msg):

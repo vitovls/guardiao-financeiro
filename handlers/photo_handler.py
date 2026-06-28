@@ -1,3 +1,5 @@
+import os
+
 from services.message_service import formatter_message
 from services.ocr_service import extract_photo_data
 from services.transacao_service import salvar_transacoes
@@ -11,7 +13,11 @@ async def get_photo(update, context):
     await update.message.reply_text("...")
     await file.download_to_drive(path)
 
-    transactions = await extract_photo_data(path)
+    try:
+        transactions = await extract_photo_data(path)
+    finally:
+        os.remove(path)
+
     await salvar_transacoes(transactions, usuario_id)
     mensagem = formatter_message(transactions)
     await update.message.reply_text(mensagem, parse_mode="HTML")
