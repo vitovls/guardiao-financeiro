@@ -2,11 +2,13 @@ from run_polling.config import BOT_TOKEN
 from telegram.ext import Application, MessageHandler, filters
 
 from handlers.text_handler import get_message
+from handlers.photo_handler import get_photo
 
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT, get_message))
+    app.add_handler(MessageHandler(filters.PHOTO, get_photo))
     print("Bot rodando... aguardando mensagens.")
     app.run_polling()
 
