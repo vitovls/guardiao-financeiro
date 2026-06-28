@@ -1,0 +1,16 @@
+# Env
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+.venv/
+
+# Fotos recebidas pelo bot
+fotos/
+
+# IDEs
+.vscode/
+.idea/
