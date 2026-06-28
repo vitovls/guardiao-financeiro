@@ -1,4 +1,5 @@
-from services.ocr_service import extract_photo_data, formatter_message
+from services.message_service import formatter_message
+from services.ocr_service import extract_photo_data
 
 
 async def get_photo(update, context):

@@ -14,3 +14,6 @@ fotos/
 # IDEs
 .vscode/
 .idea/
+
+# IA
+.claude

@@ -1,9 +1,9 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from services.message_service import split_message
+from services.message_service import formatter_message, split_message
 from services.nlp_service import extract_text_transference
-from services.ocr_service import formatter_message
+
 
 async def get_message(update: Update, context: ContextTypes):
     txt = update.message.text
