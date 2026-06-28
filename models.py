@@ -1,10 +1,11 @@
+from datetime import date
 from typing import Literal
 
 from pydantic import BaseModel
 
 
 class Transacao(BaseModel):
-    data: str
+    data: date
     descricao: str
     valor: float
     tipo: Literal["entrada", "saida"]

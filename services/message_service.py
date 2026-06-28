@@ -35,7 +35,7 @@ def formatter_message(transactions: list[Transacao]) -> str:
             enter += t.valor
         else:
             leave += t.valor
-        lines.append(f"{emoji} {t.data} — {t.descricao}: R$ {t.valor:.2f}")
+        lines.append(f"{emoji} {t.data.strftime('%d/%m/%Y')} — {t.descricao}: R$ {t.valor:.2f}")
 
     balance = enter - leave
     lines.append("")

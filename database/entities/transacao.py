@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import DateTime, Float, Integer, String
+from sqlalchemy import Date, DateTime, Float, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 from database.base import Base
 
@@ -12,7 +12,7 @@ class TransacaoEntity(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     usuario_telegram_id: Mapped[int] = mapped_column(Integer, index=True)
     
-    data: Mapped[str] = mapped_column(String)
+    data: Mapped[date] = mapped_column(Date)
     descricao: Mapped[str] = mapped_column(String)
     valor:  Mapped[float] = mapped_column(Float)
     tipo: Mapped[str] = mapped_column(String)
