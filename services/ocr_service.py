@@ -4,6 +4,7 @@ from google import genai
 from google.genai import types
 
 from models import Transacao
+from prompts import TRANSACTION_SCHEMA
 from run_polling.config import GEMINI_API_KEY
 
 client = genai.Client(api_key=GEMINI_API_KEY)
@@ -26,11 +27,7 @@ async def extract_photo_data(caminho_imagem: str) -> list[Transacao]:
         model="gemini-2.5-flash",
         contents=[
             types.Part.from_bytes(data=file_bytes, mime_type=mime_type),
-            (
-                prompt
-                + 'Responda APENAS com JSON: [{"data": "", "descricao": "", '
-                '"valor": 0.0, "tipo": "entrada|saida"}]'
-            ),
+            (prompt + f"Responda APENAS com JSON: {TRANSACTION_SCHEMA}"),
         ],
         config=types.GenerateContentConfig(response_mime_type="application/json"),
     )
