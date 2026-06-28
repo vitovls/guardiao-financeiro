@@ -3,10 +3,6 @@ from services.ocr_service import extract_photo_data
 
 
 async def get_photo(update, context):
-    # if not usuario_autorizado(update.effective_user.id):
-    #     await update.message.reply_text("Acesso não autorizado.")
-    #     return
-
     photo = update.message.photo[-1]
     file = await photo.get_file()
     path = f"fotos/{photo.file_unique_id}.jpg"
