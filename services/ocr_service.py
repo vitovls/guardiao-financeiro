@@ -1,15 +1,18 @@
+import json
+
 from google import genai
 from google.genai import types
 
+from models import Transacao
 from run_polling.config import GEMINI_API_KEY
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 
-async def extract_photo_data(caminho_imagem: str) -> str:
+async def extract_photo_data(caminho_imagem: str) -> list[Transacao]:
     with open(caminho_imagem, "rb") as f:
         file_bytes = f.read()
-        
+
     if caminho_imagem.endswith(".jpg"):
         mime_type = "image/jpeg"
         prompt = "Extraia as transações desta imagem de extrato bancário. "
@@ -32,4 +35,5 @@ async def extract_photo_data(caminho_imagem: str) -> str:
         config=types.GenerateContentConfig(response_mime_type="application/json"),
     )
 
-    return response.text
+    dados = json.loads(response.text)
+    return [Transacao(**item) for item in dados]

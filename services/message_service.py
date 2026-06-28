@@ -1,4 +1,4 @@
-import json
+from models import Transacao
 
 
 def split_message(text: str, limit: int = 4096) -> list[str]:
@@ -21,12 +21,7 @@ def split_message(text: str, limit: int = 4096) -> list[str]:
 
     return block
   
-def formatter_message(json_str: str) -> str:
-    try:
-        transactions = json.loads(json_str)
-    except json.JSONDecodeError:
-        return "⚠️ Não consegui interpretar o extrato. Tenta mandar a foto novamente?"
-
+def formatter_message(transactions: list[Transacao]) -> str:
     if not transactions:
         return "Não encontrei nenhuma transação nessa imagem."
 
@@ -35,13 +30,12 @@ def formatter_message(json_str: str) -> str:
     leave = 0.0
 
     for t in transactions:
-        emoji = "🟢" if t["tipo"] == "entrada" else "🔴"
-        valor = t["valor"]
-        if t["tipo"] == "entrada":
-            enter += valor
+        emoji = "🟢" if t.tipo == "entrada" else "🔴"
+        if t.tipo == "entrada":
+            enter += t.valor
         else:
-            leave += valor
-        lines.append(f"{emoji} {t['data']} — {t['descricao']}: R$ {valor:.2f}")
+            leave += t.valor
+        lines.append(f"{emoji} {t.data} — {t.descricao}: R$ {t.valor:.2f}")
 
     balance = enter - leave
     lines.append("")
