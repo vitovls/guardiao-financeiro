@@ -18,5 +18,8 @@ fotos/
 .vscode/
 .idea/
 
+# Git worktrees
+.worktrees/
+
 # IA
 .claude
