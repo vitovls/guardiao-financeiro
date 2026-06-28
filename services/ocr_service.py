@@ -10,18 +10,18 @@ from run_polling.config import GEMINI_API_KEY
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 
-async def extract_photo_data(caminho_imagem: str) -> list[Transacao]:
-    with open(caminho_imagem, "rb") as f:
+async def extract_photo_data(image_path: str) -> list[Transacao]:
+    with open(image_path, "rb") as f:
         file_bytes = f.read()
 
-    if caminho_imagem.endswith(".jpg"):
+    if image_path.endswith(".jpg"):
         mime_type = "image/jpeg"
         prompt = "Extraia as transações desta imagem de extrato bancário. "
-    elif caminho_imagem.endswith(".pdf"):
+    elif image_path.endswith(".pdf"):
         mime_type = "application/pdf"
         prompt = "Extraia as transações desse pdf de extrato bancário. "
     else:
-        raise ValueError(f"Formato não suportado: {caminho_imagem}")
+        raise ValueError(f"Formato não suportado: {image_path}")
 
     response = client.models.generate_content(
         model="gemini-2.5-flash",
@@ -32,5 +32,5 @@ async def extract_photo_data(caminho_imagem: str) -> list[Transacao]:
         config=types.GenerateContentConfig(response_mime_type="application/json"),
     )
 
-    dados = json.loads(response.text)
-    return [Transacao(**item) for item in dados]
+    response_data = json.loads(response.text)
+    return [Transacao(**item) for item in response_data]

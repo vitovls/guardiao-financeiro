@@ -11,13 +11,13 @@ from run_polling.config import GEMINI_API_KEY
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 
-async def extract_text_transference(txt: str) -> list[Transacao]:
+async def extract_text_transactions(text: str) -> list[Transacao]:
     today = date.today().isoformat()
 
     response = client.models.generate_content(
         model="gemini-2.5-flash",
         contents=(
-            f'A data de hoje é {today}. O usuário escreveu: "{txt}". '
+            f'A data de hoje é {today}. O usuário escreveu: "{text}". '
             f'Responda APENAS com JSON neste formato: {{"e_transacao": true|false, "transacoes": {TRANSACTION_SCHEMA}}}. '
             'Marque "e_transacao" como false se a mensagem não descrever um gasto ou '
             'recebimento (ex: saudação, pergunta, conversa solta). Nesse caso, '
@@ -27,9 +27,9 @@ async def extract_text_transference(txt: str) -> list[Transacao]:
         config=types.GenerateContentConfig(response_mime_type="application/json"),
     )
 
-    dados = json.loads(response.text)
+    response_data = json.loads(response.text)
 
-    if not dados.get("e_transacao"):
+    if not response_data.get("e_transacao"):
         return []
 
-    return [Transacao(**item) for item in dados["transacoes"]]
+    return [Transacao(**item) for item in response_data["transacoes"]]

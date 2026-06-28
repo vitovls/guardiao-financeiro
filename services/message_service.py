@@ -9,39 +9,40 @@ def split_message(text: str, limit: int = 4096) -> list[str]:
     lines = text.split("\n")
     cur = ""
 
-    for linha in lines:
-        if len(cur) + len(linha) + 1 > limit:
+    for line in lines:
+        if len(cur) + len(line) + 1 > limit:
             block.append(cur)
-            cur = linha
+            cur = line
         else:
-            cur = f"{cur}\n{linha}" if cur else linha
+            cur = f"{cur}\n{line}" if cur else line
 
     if cur:
         block.append(cur)
 
     return block
-  
-def formatter_message(transactions: list[Transacao]) -> str:
+
+
+def format_message(transactions: list[Transacao]) -> str:
     if not transactions:
         return "Não encontrei nenhuma transação nessa imagem."
 
     lines = ["<b>📊 Extrato processado</b>", ""]
-    enter = 0.0
-    leave = 0.0
+    income_total = 0.0
+    expense_total = 0.0
 
     for t in transactions:
         emoji = "🟢" if t.tipo == "entrada" else "🔴"
         if t.tipo == "entrada":
-            enter += t.valor
+            income_total += t.valor
         else:
-            leave += t.valor
+            expense_total += t.valor
         lines.append(f"{emoji} {t.data.strftime('%d/%m/%Y')} — {t.descricao}: R$ {t.valor:.2f}")
 
-    balance = enter - leave
+    balance = income_total - expense_total
     lines.append("")
     lines.append("<b>Resumo</b>")
-    lines.append(f"🟢 Entradas: R$ {enter:.2f}")
-    lines.append(f"🔴 Saídas: R$ {leave:.2f}")
+    lines.append(f"🟢 Entradas: R$ {income_total:.2f}")
+    lines.append(f"🔴 Saídas: R$ {expense_total:.2f}")
     lines.append(f"💰 Saldo: R$ {balance:.2f}")
 
     return "\n".join(lines)

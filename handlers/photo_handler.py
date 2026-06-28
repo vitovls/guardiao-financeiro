@@ -1,12 +1,12 @@
 import os
 
-from services.message_service import formatter_message
+from services.message_service import format_message
 from services.ocr_service import extract_photo_data
-from services.transacao_service import salvar_transacoes
+from services.transaction_service import save_transactions
 
 
 async def get_photo(update, context):
-    usuario_id = update.effective_user.id
+    user_id = update.effective_user.id
     photo = update.message.photo[-1]
     file = await photo.get_file()
     path = f"fotos/{photo.file_unique_id}.jpg"
@@ -18,6 +18,6 @@ async def get_photo(update, context):
     finally:
         os.remove(path)
 
-    await salvar_transacoes(transactions, usuario_id)
-    mensagem = formatter_message(transactions)
-    await update.message.reply_text(mensagem, parse_mode="HTML")
+    await save_transactions(transactions, user_id)
+    message = format_message(transactions)
+    await update.message.reply_text(message, parse_mode="HTML")

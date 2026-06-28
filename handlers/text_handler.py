@@ -1,15 +1,15 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from services.message_service import formatter_message, split_message
-from services.nlp_service import extract_text_transference
-from services.transacao_service import salvar_transacoes
+from services.message_service import format_message, split_message
+from services.nlp_service import extract_text_transactions
+from services.transaction_service import save_transactions
 
 
 async def get_message(update: Update, context: ContextTypes):
-    usuario_id = update.effective_user.id
-    txt = update.message.text
-    transactions = await extract_text_transference(txt)
+    user_id = update.effective_user.id
+    text = update.message.text
+    transactions = await extract_text_transactions(text)
 
     if not transactions:
         await update.message.reply_text(
@@ -18,8 +18,8 @@ async def get_message(update: Update, context: ContextTypes):
         )
         return
 
-    await salvar_transacoes(transactions, usuario_id)
+    await save_transactions(transactions, user_id)
 
-    msg = formatter_message(transactions)
+    msg = format_message(transactions)
     for block in split_message(msg):
         await update.message.reply_text(block, parse_mode="HTML")
