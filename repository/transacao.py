@@ -9,16 +9,16 @@ class TransacaoRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def salvar(self, transacao: Transacao, usuario_telegram_id: int) -> None:
-        entity = TransacaoEntity(
-            usuario_telegram_id=usuario_telegram_id,
-            data=transacao.data,
-            descricao=transacao.descricao,
-            valor=transacao.valor,
-            tipo=transacao.tipo,
-            categoria=transacao.categoria,
-        )
-        self.session.add(entity)
+    async def salvar_transacoes(self, transacoes: list[Transacao], usuario_telegram_id: int) -> None:
+        for transacao in transacoes:
+            self.session.add(TransacaoEntity(
+                usuario_telegram_id=usuario_telegram_id,
+                data=transacao.data,
+                descricao=transacao.descricao,
+                valor=transacao.valor,
+                tipo=transacao.tipo,
+                categoria=transacao.categoria,
+            ))
         await self.session.commit()
 
     async def buscar_por_usuario(self, usuario_telegram_id: int) -> list[Transacao]:
