@@ -17,6 +17,9 @@ python main.py
 | SQLAlchemy (async) | 2.0.51 |
 | aiosqlite | 0.22.1 |
 | python-dotenv | 1.2.2 |
+| boto3 (AWS/Bedrock SDK) | 1.43.56 |
+| pytest | 9.1.1 |
+| pytest-asyncio | 1.4.0 |
 
 **Banco de dados:** SQLite local (`guardiao.db`), sem Alembic — migrações são feitas via `init_db()` (create_all).
 
@@ -76,7 +79,7 @@ run_polling/   → config (variáveis de ambiente)
 
 ## Testes
 
-Nenhum test runner configurado ainda. Quando configurado: [a confirmar].
+`pytest` + `pytest-asyncio` (`pytest.ini` com `asyncio_mode = auto`). Rodar com `pytest` na raiz. Testes ficam em `tests/`, espelhando a estrutura de `services/` (ex.: `services/llm/bedrock_provider.py` → `tests/services/llm/test_bedrock_provider.py`), sem `__init__.py`. Chamadas reais a LLM/AWS nunca entram em teste automatizado — só client mockado; cenários end-to-end ficam como "Cenários de Teste Manual" no TASKS. Decisão registrada em `docs/PATTERNS.md` (origem: `TASKS004-gemini-para-bedrock.md`).
 
 ## Fluxo de Trabalho (SDD)
 
