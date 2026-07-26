@@ -1,0 +1,376 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Infraestrutura serverless para o fluxo de IA do Guardiao Financeiro (Step Functions, S3, DynamoDB, Bedrock, Lambda)'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, homolog, prod]
+    Description: Ambiente de implantacao da infraestrutura.
+
+  BedrockTextModelArn:
+    Type: String
+    Default: 'arn:aws:bedrock:us-east-2::foundation-model/amazon.nova-micro-v1:0'
+    Description: >
+      SLM usado para extrair/normalizar transacoes e interpretar consultas em
+      texto puro (sem imagem). Nova Micro e a opcao mais barata da familia
+      Nova e cobre bem tarefas de extracao estruturada e classificacao.
+
+  BedrockOcrModelArn:
+    Type: String
+    Default: 'arn:aws:bedrock:us-east-2::foundation-model/amazon.nova-lite-v1:0'
+    Description: >
+      Modelo multimodal usado so no passo de OCR (fotos/PDFs). Nova Lite e o
+      nivel mais barato da familia Nova que processa imagem, evitando ir
+      direto para modelos maiores (Nova Pro/Claude) que seriam overkill para
+      leitura de recibo/nota.
+
+Resources:
+  # ---------------------------------------------------------------------
+  # 1. Armazenamento de arquivos (fotos, PDFs recebidos via Telegram)
+  # ---------------------------------------------------------------------
+  MyDataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'guardiao-financeiro-dados-${Environment}-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  # ---------------------------------------------------------------------
+  # 2. Banco de dados de transacoes
+  #    Schema pensado para consultas reais de um bot financeiro:
+  #    PK = userId (particiona por usuario)
+  #    SK = timestamp#transactionId (ordena por data, permite range query)
+  #    GSI por categoria, para perguntas tipo "quanto gastei em mercado".
+  # ---------------------------------------------------------------------
+  MyDynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'GuardiaoFinanceiro-Transacoes-${Environment}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: sortKey
+          AttributeType: S
+        - AttributeName: categoria
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: sortKey
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: GSI-Categoria
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+            - AttributeName: categoria
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  # ---------------------------------------------------------------------
+  # 3. Role da state machine, com permissoes restritas ao necessario
+  # ---------------------------------------------------------------------
+  MyStateMachineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: StepFunctionsExecutionPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource:
+                  - !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:guardiao-financeiro-${Environment}-*'
+
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:Query
+                Resource:
+                  - !GetAtt MyDynamoDBTable.Arn
+                  - !Sub '${MyDynamoDBTable.Arn}/index/*'
+
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                Resource: !Sub '${MyDataBucket.Arn}/*'
+
+              - Effect: Allow
+                Action: bedrock:InvokeModel
+                Resource:
+                  - !Ref BedrockTextModelArn
+                  - !Ref BedrockOcrModelArn
+
+              - Effect: Allow
+                Action: states:InvokeHTTPEndpoint
+                Resource: !Sub 'arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:Fluxo-GuardiaoFinanceiro-${Environment}'
+              - Effect: Allow
+                Action:
+                  - events:RetrieveConnectionCredentials
+                Resource: !Sub 'arn:aws:events:${AWS::Region}:${AWS::AccountId}:connection/guardiao-financeiro-${Environment}-*'
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:events!connection/guardiao-financeiro-${Environment}-*'
+
+  # ---------------------------------------------------------------------
+  # 4. Orquestrador (Step Functions)
+  # ---------------------------------------------------------------------
+  MyStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      StateMachineName: !Sub 'Fluxo-GuardiaoFinanceiro-${Environment}'
+      RoleArn: !GetAtt MyStateMachineRole.Arn
+      DefinitionString: !Sub
+        - |
+          {
+            "Comment": "Fluxo de validacao e processamento de mensagens do Guardiao Financeiro",
+            "StartAt": "Call HTTPS APIs",
+            "States": {
+              "Call HTTPS APIs": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::http:invoke",
+                "Arguments": { "Method": "POST" },
+                "Retry": [
+                  {
+                    "ErrorEquals": ["States.ALL"],
+                    "BackoffRate": 2,
+                    "IntervalSeconds": 1,
+                    "MaxAttempts": 3,
+                    "JitterStrategy": "FULL"
+                  }
+                ],
+                "Next": "Validacao PDF || IMG || TXT"
+              },
+              "Validacao PDF || IMG || TXT": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::lambda:invoke",
+                "Output": "{% $states.result.Payload %}",
+                "Arguments": { "Payload": "{% $states.input %}" },
+                "Retry": [
+                  {
+                    "ErrorEquals": [
+                      "Lambda.ServiceException",
+                      "Lambda.AWSLambdaException",
+                      "Lambda.SdkClientException",
+                      "Lambda.TooManyRequestsException"
+                    ],
+                    "IntervalSeconds": 1,
+                    "MaxAttempts": 3,
+                    "BackoffRate": 2,
+                    "JitterStrategy": "FULL"
+                  }
+                ],
+                "Next": "Escolha"
+              },
+              "Escolha": {
+                "Type": "Choice",
+                "Choices": [
+                  {
+                    "Condition": "{% tipo = \"TXT\" %}",
+                    "Next": "Bedrock InvokeModel tratar texto transacao ou consulta"
+                  },
+                  {
+                    "Condition": "{% tipo = \"ARQ\" %}",
+                    "Next": "PutObject"
+                  }
+                ],
+                "Default": "Falha - Tipo Desconhecido"
+              },
+              "Falha - Tipo Desconhecido": {
+                "Type": "Fail",
+                "Error": "TipoDesconhecido",
+                "Cause": "O campo tipo nao correspondeu a TXT nem a ARQ"
+              },
+              "Bedrock InvokeModel tratar texto transacao ou consulta": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::bedrock:invokeModel",
+                "Arguments": {
+                  "ModelId": "${ModeloTexto}",
+                  "Body": {}
+                },
+                "Next": "Escolha (1)"
+              },
+              "Escolha (1)": {
+                "Type": "Choice",
+                "Choices": [
+                  {
+                    "Condition": "{% (isTransaction) = (true) %}",
+                    "Next": "Bedrock InvokeModel transacao"
+                  }
+                ],
+                "Default": "Bedrock InvokeModel consulta"
+              },
+              "Bedrock InvokeModel consulta": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::bedrock:invokeModel",
+                "Arguments": { "ModelId": "${ModeloTexto}", "Body": {} },
+                "Next": "Lambda Invoke consulta"
+              },
+              "Lambda Invoke consulta": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::lambda:invoke",
+                "Output": "{% $states.result.Payload %}",
+                "Arguments": { "Payload": "{% $states.input %}" },
+                "Retry": [
+                  {
+                    "ErrorEquals": [
+                      "Lambda.ServiceException",
+                      "Lambda.AWSLambdaException",
+                      "Lambda.SdkClientException",
+                      "Lambda.TooManyRequestsException"
+                    ],
+                    "IntervalSeconds": 1,
+                    "MaxAttempts": 3,
+                    "BackoffRate": 2,
+                    "JitterStrategy": "FULL"
+                  }
+                ],
+                "Next": "DynamoDB Query Transacoes"
+              },
+              "Bedrock InvokeModel transacao": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::bedrock:invokeModel",
+                "Arguments": { "ModelId": "${ModeloTexto}", "Body": {} },
+                "Next": "Lambda Invoke Normaliza Transacao"
+              },
+              "Lambda Invoke Normaliza Transacao": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::lambda:invoke",
+                "Output": "{% $states.result.Payload %}",
+                "Arguments": { "Payload": "{% $states.input %}" },
+                "Retry": [
+                  {
+                    "ErrorEquals": [
+                      "Lambda.ServiceException",
+                      "Lambda.AWSLambdaException",
+                      "Lambda.SdkClientException",
+                      "Lambda.TooManyRequestsException"
+                    ],
+                    "IntervalSeconds": 1,
+                    "MaxAttempts": 3,
+                    "BackoffRate": 2,
+                    "JitterStrategy": "FULL"
+                  }
+                ],
+                "Next": "DynamoDB Cadastro Transacao"
+              },
+              "DynamoDB Cadastro Transacao": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::dynamodb:putItem",
+                "Arguments": {
+                  "TableName": "${TabelaNome}",
+                  "Item": {
+                    "userId": { "S": "{% $states.input.userId %}" },
+                    "sortKey": { "S": "{% $states.input.sortKey %}" },
+                    "categoria": { "S": "{% $states.input.categoria %}" },
+                    "valor": { "N": "{% $states.input.valor %}" }
+                  }
+                },
+                "End": true
+              },
+              "DynamoDB Query Transacoes": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::aws-sdk:dynamodb:query",
+                "Arguments": {
+                  "TableName": "${TabelaNome}",
+                  "KeyConditionExpression": "userId = :uid",
+                  "ExpressionAttributeValues": {
+                    ":uid": { "S": "{% $states.input.userId %}" }
+                  }
+                },
+                "Next": "Lambda Invoke"
+              },
+              "Lambda Invoke": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::lambda:invoke",
+                "Output": "{% $states.result.Payload %}",
+                "Arguments": { "Payload": "{% $states.input %}" },
+                "Retry": [
+                  {
+                    "ErrorEquals": [
+                      "Lambda.ServiceException",
+                      "Lambda.AWSLambdaException",
+                      "Lambda.SdkClientException",
+                      "Lambda.TooManyRequestsException"
+                    ],
+                    "IntervalSeconds": 1,
+                    "MaxAttempts": 3,
+                    "BackoffRate": 2,
+                    "JitterStrategy": "FULL"
+                  }
+                ],
+                "End": true
+              },
+              "PutObject": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::aws-sdk:s3:putObject",
+                "Arguments": {
+                  "Body": "{% $states.input.body %}",
+                  "Bucket": "${BucketNome}",
+                  "Key": "{% $states.input.key %}"
+                },
+                "Next": "Bedrock InvokeModel OCR arquivo"
+              },
+              "Bedrock InvokeModel OCR arquivo": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::bedrock:invokeModel",
+                "Arguments": { "ModelId": "${ModeloOcr}", "Body": {} },
+                "Next": "Lambda Invoke Normaliza Arquivo"
+              },
+              "Lambda Invoke Normaliza Arquivo": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::lambda:invoke",
+                "Output": "{% $states.result.Payload %}",
+                "Arguments": { "Payload": "{% $states.input %}" },
+                "Retry": [
+                  {
+                    "ErrorEquals": [
+                      "Lambda.ServiceException",
+                      "Lambda.AWSLambdaException",
+                      "Lambda.SdkClientException",
+                      "Lambda.TooManyRequestsException"
+                    ],
+                    "IntervalSeconds": 1,
+                    "MaxAttempts": 3,
+                    "BackoffRate": 2,
+                    "JitterStrategy": "FULL"
+                  }
+                ],
+                "Next": "DynamoDB Cadastro Transacao"
+              }
+            }
+          }
+        - TabelaNome: !Ref MyDynamoDBTable
+          BucketNome: !Ref MyDataBucket
+          ModeloTexto: !Ref BedrockTextModelArn
+          ModeloOcr: !Ref BedrockOcrModelArn
+
+Outputs:
+  BucketName:
+    Value: !Ref MyDataBucket
+  TableName:
+    Value: !Ref MyDynamoDBTable
+  StateMachineArn:
+    Value: !Ref MyStateMachine
