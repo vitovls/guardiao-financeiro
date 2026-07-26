@@ -3,3 +3,4 @@ python-dotenv==1.2.2
 python-telegram-bot==22.8
 sqlalchemy==2.0.51
 aiosqlite==0.22.1
+boto3==1.43.56

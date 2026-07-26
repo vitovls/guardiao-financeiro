@@ -85,4 +85,10 @@ Toda tarefa passa por:
 2. `/clear`
 3. `/start-task docs/tasks/TASKSXXX-slug.md` — implementa com TDD a partir do doc aprovado.
 
+## Branches
+
+- **Nunca implementar direto na `main`.** Cada INV (`docs/analysis/INVXXX-*.md`) e cada fase da lista de tarefas de `docs/analysis/plano-contexto.md` (seção "Lista de tarefas") vira sua própria branch antes de qualquer código.
+- Convenção de nome: `feat/{slug}` (ex.: `feat/fundacao-aws` para a Fase 0, `feat/bedrock-provider` para a Fase 1).
+- Ao concluir a fase/INV, abrir PR de `feat/{slug}` → `main` para revisão — sem merge direto local.
+
 Leitura obrigatória antes de tocar código: este arquivo e `docs/PATTERNS.md`.
