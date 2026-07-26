@@ -1,35 +1,14 @@
-import json
-from datetime import date
-
-from google import genai
-from google.genai import types
+import sys
 
 from models import Transacao
-from prompts import TRANSACTION_SCHEMA
-from run_polling.config import GEMINI_API_KEY
+from services.llm.factory import get_llm_provider
 
-client = genai.Client(api_key=GEMINI_API_KEY)
+_provider = get_llm_provider()
 
 
 async def extract_text_transactions(text: str) -> list[Transacao]:
-    today = date.today().isoformat()
-
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=(
-            f'A data de hoje é {today}. O usuário escreveu: "{text}". '
-            f'Responda APENAS com JSON neste formato: {{"e_transacao": true|false, "transacoes": {TRANSACTION_SCHEMA}}}. '
-            'Marque "e_transacao" como false se a mensagem não descrever um gasto ou '
-            'recebimento (ex: saudação, pergunta, conversa solta). Nesse caso, '
-            '"transacoes" deve ser uma lista vazia. '
-            "Se não houver data explícita na mensagem, use a data de hoje."
-        ),
-        config=types.GenerateContentConfig(response_mime_type="application/json"),
-    )
-
-    response_data = json.loads(response.text)
-
-    if not response_data.get("e_transacao"):
+    try:
+        return await _provider.extract_text_transactions(text)
+    except Exception as exc:
+        print(f"[nlp_service] falha ao extrair transação de texto: {exc}", file=sys.stderr)
         return []
-
-    return [Transacao(**item) for item in response_data["transacoes"]]
