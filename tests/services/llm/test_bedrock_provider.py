@@ -237,6 +237,28 @@ async def test_missing_expected_key_retries_and_raises_bedrock_output_error_if_p
     assert client.converse.call_count == 2
 
 
+async def test_extract_document_transactions_passes_temperature_zero():
+    response_text = json.dumps([])
+    client = _mock_client(response_text)
+    provider = BedrockProvider(client=client)
+
+    await provider.extract_document_transactions(b"fake-bytes", "application/pdf")
+
+    call_kwargs = client.converse.call_args.kwargs
+    assert call_kwargs["inferenceConfig"]["temperature"] == 0.0
+
+
+async def test_extract_text_transactions_does_not_set_temperature():
+    response_text = json.dumps({"e_transacao": False, "transacoes": []})
+    client = _mock_client(response_text)
+    provider = BedrockProvider(client=client)
+
+    await provider.extract_text_transactions("oi")
+
+    call_kwargs = client.converse.call_args.kwargs
+    assert "temperature" not in call_kwargs["inferenceConfig"]
+
+
 async def test_pydantic_validation_failure_retries_and_raises_bedrock_output_error_if_persists():
     invalid_item_text = json.dumps(
         {

@@ -13,7 +13,7 @@ from services.llm.provider import BedrockOutputError, LLMProvider
 
 REGION = "us-east-2"
 TEXT_MODEL_ID = "us.amazon.nova-lite-v1:0"
-DOCUMENT_MODEL_ID = "us.amazon.nova-lite-v1:0"
+DOCUMENT_MODEL_ID = "us.meta.llama4-maverick-17b-instruct-v1:0"
 
 _MIME_TO_IMAGE_FORMAT = {"image/jpeg": "jpeg"}
 _MIME_TO_DOCUMENT_FORMAT = {"application/pdf": "pdf"}
@@ -30,13 +30,19 @@ _RETRYABLE_ERROR_CODES = {"ThrottlingException"}
 _MAX_OUTPUT_TOKENS = 5000
 
 
-async def _converse_with_retry(client, model_id: str, messages: list[dict]) -> str:
+async def _converse_with_retry(
+    client, model_id: str, messages: list[dict], temperature: float | None = None
+) -> str:
+    inference_config = {"maxTokens": _MAX_OUTPUT_TOKENS}
+    if temperature is not None:
+        inference_config["temperature"] = temperature
+
     for attempt in range(_MAX_ATTEMPTS):
         try:
             response = client.converse(
                 modelId=model_id,
                 messages=messages,
-                inferenceConfig={"maxTokens": _MAX_OUTPUT_TOKENS},
+                inferenceConfig=inference_config,
             )
             return response["output"]["message"]["content"][0]["text"]
         except ClientError as exc:
@@ -76,7 +82,9 @@ class BedrockProvider(LLMProvider):
         prompt = build_document_extraction_prompt(label)
         content_block = self._build_content_block(file_bytes, mime_type)
         messages = [{"role": "user", "content": [content_block, {"text": prompt}]}]
-        return await self._call_with_malformed_retry(DOCUMENT_MODEL_ID, messages, self._parse_document_response)
+        return await self._call_with_malformed_retry(
+            DOCUMENT_MODEL_ID, messages, self._parse_document_response, temperature=0.0
+        )
 
     def _parse_text_response(self, response_data: dict) -> list[Transacao]:
         if not response_data.get("e_transacao"):
@@ -99,9 +107,11 @@ class BedrockProvider(LLMProvider):
             }
         raise ValueError(f"mime_type não suportado: {mime_type}")
 
-    async def _call_with_malformed_retry(self, model_id: str, messages: list[dict], parse_fn) -> list[Transacao]:
+    async def _call_with_malformed_retry(
+        self, model_id: str, messages: list[dict], parse_fn, temperature: float | None = None
+    ) -> list[Transacao]:
         for attempt in range(2):
-            text = await _converse_with_retry(self._client, model_id, messages)
+            text = await _converse_with_retry(self._client, model_id, messages, temperature=temperature)
             try:
                 response_data = json.loads(_strip_markdown_fence(text))
                 return parse_fn(response_data)

@@ -17,5 +17,17 @@ def build_text_extraction_prompt(today: str, text: str) -> str:
 def build_document_extraction_prompt(document_label: str) -> str:
     return (
         f"Extraia as transações deste(a) {document_label} de extrato bancário. "
+        "Uma transação é uma movimentação individual e específica de dinheiro — um Pix, "
+        "uma compra no débito, uma transferência — sempre associada a um remetente, "
+        "beneficiário ou estabelecimento nomeado. "
+        'NÃO são transações, mesmo que tenham valor em R$: linhas de "Total de entradas" '
+        'ou "Total de saídas" (são subtotais, não movimentações individuais), '
+        '"Saldo inicial", "Saldo final", "Saldo do período" ou "Saldo do dia", qualquer '
+        "coluna de saldo corrente/acumulado, e cabeçalhos de tabela/página ou rodapé com "
+        "CNPJ/atendimento/SAC — ignore essas linhas completamente. "
+        "Para cada transação, inclua na descrição o nome completo do remetente ou "
+        "beneficiário e os detalhes de conta/agência exatamente como aparecem no "
+        "documento — nunca resuma ou omita essas informações, mesmo que se repitam "
+        "entre transações. "
         f"Responda APENAS com JSON: {TRANSACTION_SCHEMA}"
     )
