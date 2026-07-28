@@ -16,6 +16,7 @@ def _build_update(file_size: int = 1000, file_bytes: bytes = b"fake-bytes", mime
 
     update = Mock()
     update.effective_user.id = 42
+    update.update_id = 1
     update.message.document = pdf
     update.message.reply_text = AsyncMock()
 
@@ -28,13 +29,15 @@ async def test_happy_path_uploads_extracts_deletes_and_replies(monkeypatch):
     update, pdf = _build_update()
     context = Mock()
 
+    monkeypatch.setattr(pdf_handler, "claim_update", AsyncMock(return_value=True))
     storage = AsyncMock()
     storage.upload.return_value = "files/42-123-extrato.pdf"
     monkeypatch.setattr(pdf_handler, "_storage", storage)
 
     extract_document_data = AsyncMock(return_value=["transacao-fake"])
     monkeypatch.setattr(pdf_handler, "extract_document_data", extract_document_data)
-    save_transactions = AsyncMock(return_value=["resultado-fake"])
+    resultado_fake = Mock(pendencia=None)
+    save_transactions = AsyncMock(return_value=[resultado_fake])
     monkeypatch.setattr(pdf_handler, "save_transactions", save_transactions)
     format_message = Mock(return_value="mensagem formatada")
     monkeypatch.setattr(pdf_handler, "format_message", format_message)
@@ -50,7 +53,7 @@ async def test_happy_path_uploads_extracts_deletes_and_replies(monkeypatch):
     storage.delete.assert_awaited_once_with("files/42-123-extrato.pdf")
 
     save_transactions.assert_awaited_once_with(["transacao-fake"], 42)
-    format_message.assert_called_once_with(["resultado-fake"])
+    format_message.assert_called_once_with([resultado_fake])
     update.message.reply_text.assert_any_call("mensagem formatada", parse_mode="HTML")
 
 
@@ -61,6 +64,7 @@ async def test_file_too_large_replies_and_does_not_call_get_file(monkeypatch):
     update, pdf = _build_update(file_size=MAX_FILE_SIZE_BYTES + 1)
     context = Mock()
 
+    monkeypatch.setattr(pdf_handler, "claim_update", AsyncMock(return_value=True))
     storage = AsyncMock()
     monkeypatch.setattr(pdf_handler, "_storage", storage)
 
@@ -77,6 +81,7 @@ async def test_upload_failure_replies_error_and_does_not_extract(monkeypatch):
     update, pdf = _build_update()
     context = Mock()
 
+    monkeypatch.setattr(pdf_handler, "claim_update", AsyncMock(return_value=True))
     storage = AsyncMock()
     storage.upload.side_effect = StorageProviderError("falha")
     monkeypatch.setattr(pdf_handler, "_storage", storage)
@@ -96,6 +101,7 @@ async def test_missing_mime_type_falls_back_to_application_pdf(monkeypatch):
     update, pdf = _build_update(mime_type=None)
     context = Mock()
 
+    monkeypatch.setattr(pdf_handler, "claim_update", AsyncMock(return_value=True))
     storage = AsyncMock()
     storage.upload.return_value = "files/42-123-extrato.pdf"
     monkeypatch.setattr(pdf_handler, "_storage", storage)
@@ -108,3 +114,44 @@ async def test_missing_mime_type_falls_back_to_application_pdf(monkeypatch):
     await pdf_handler.get_pdf(update, context)
 
     extract_document_data.assert_awaited_once_with(b"fake-bytes", "application/pdf")
+
+
+async def test_already_processed_update_skips_extraction(monkeypatch):
+    import handlers.pdf_handler as pdf_handler
+
+    update, pdf = _build_update()
+    update.update_id = 999
+    context = Mock()
+
+    monkeypatch.setattr(pdf_handler, "claim_update", AsyncMock(return_value=False))
+    extract_document_data = AsyncMock()
+    monkeypatch.setattr(pdf_handler, "extract_document_data", extract_document_data)
+
+    await pdf_handler.get_pdf(update, context)
+
+    pdf.get_file.assert_not_called()
+    extract_document_data.assert_not_awaited()
+    update.message.reply_text.assert_not_awaited()
+
+
+async def test_pending_result_sends_extra_message_with_keyboard(monkeypatch):
+    import handlers.pdf_handler as pdf_handler
+
+    update, pdf = _build_update()
+    context = Mock()
+
+    monkeypatch.setattr(pdf_handler, "claim_update", AsyncMock(return_value=True))
+    storage = AsyncMock()
+    storage.upload.return_value = "files/42-123-extrato.pdf"
+    monkeypatch.setattr(pdf_handler, "_storage", storage)
+    monkeypatch.setattr(pdf_handler, "extract_document_data", AsyncMock(return_value=["transacao-fake"]))
+    pendencia_fake = Mock(id="abc123")
+    resultado_fake = Mock(pendencia=pendencia_fake)
+    monkeypatch.setattr(pdf_handler, "save_transactions", AsyncMock(return_value=[resultado_fake]))
+    monkeypatch.setattr(pdf_handler, "format_message", Mock(return_value="resumo"))
+    monkeypatch.setattr(pdf_handler, "format_pending_message", Mock(return_value="texto pendencia"))
+
+    await pdf_handler.get_pdf(update, context)
+
+    calls = update.message.reply_text.call_args_list
+    assert any(call.args[0] == "texto pendencia" for call in calls)

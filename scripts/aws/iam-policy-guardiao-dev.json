@@ -47,7 +47,8 @@
       "Action": [
         "dynamodb:GetItem",
         "dynamodb:PutItem",
-        "dynamodb:Query"
+        "dynamodb:Query",
+        "dynamodb:DeleteItem"
       ],
       "Resource": [
         "arn:aws:dynamodb:us-east-2:413948096391:table/GuardiaoFinanceiro-Transacoes-dev",

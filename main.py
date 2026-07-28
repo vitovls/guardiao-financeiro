@@ -1,8 +1,9 @@
 import asyncio
 
-from telegram.ext import Application, MessageHandler, filters
+from telegram.ext import Application, CallbackQueryHandler, CommandHandler, MessageHandler, filters
 
 from handlers.pdf_handler import get_pdf
+from handlers.pending_handler import get_pendencias, handle_pending_callback
 from handlers.photo_handler import get_photo
 from handlers.text_handler import get_message
 from run_polling.config import BOT_TOKEN, DB_BACKEND
@@ -14,6 +15,8 @@ def main():
         asyncio.run(init_db())
 
     app = Application.builder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("pendencias", get_pendencias))
+    app.add_handler(CallbackQueryHandler(handle_pending_callback, pattern=r"^pend:"))
     app.add_handler(MessageHandler(filters.TEXT, get_message))
     app.add_handler(MessageHandler(filters.PHOTO, get_photo))
     app.add_handler(MessageHandler(filters.Document.PDF, get_pdf))

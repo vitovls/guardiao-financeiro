@@ -4,7 +4,12 @@ import pytest
 from pydantic import ValidationError
 
 from models import Transacao
-from repository.provider import ConfigItem, TransactionRepository, TransactionSaveResult
+from repository.provider import (
+    ConfigItem,
+    PendingConfirmation,
+    TransactionRepository,
+    TransactionSaveResult,
+)
 
 
 class _ConcreteRepository(TransactionRepository):
@@ -55,3 +60,30 @@ def test_config_item_rejects_periodo_outside_literal():
     now = datetime(2026, 1, 1, 12, 0, 0)
     with pytest.raises(ValidationError):
         ConfigItem(nome="lazer", teto=300.0, periodo="invalido", created_at=now, updated_at=now)
+
+
+def test_pending_confirmation_accepts_expected_fields():
+    now = datetime(2026, 1, 1, 12, 0, 0)
+    pendencia = PendingConfirmation(
+        id="abc123", transacao=_transacao(), motivo="suspeita", criado_em=now,
+    )
+    assert pendencia.similares == []
+    assert pendencia.similar_criado_em is None
+
+
+def test_pending_confirmation_rejects_motivo_outside_literal():
+    now = datetime(2026, 1, 1, 12, 0, 0)
+    with pytest.raises(ValidationError):
+        PendingConfirmation(id="abc123", transacao=_transacao(), motivo="invalido", criado_em=now)
+
+
+def test_transaction_save_result_accepts_pendencia_field():
+    now = datetime(2026, 1, 1, 12, 0, 0)
+    pendencia = PendingConfirmation(id="abc123", transacao=_transacao(), motivo="suspeita", criado_em=now)
+    result = TransactionSaveResult(transacao=_transacao(), status="suspeita", pendencia=pendencia)
+    assert result.pendencia.id == "abc123"
+
+
+def test_transaction_save_result_pendencia_defaults_to_none():
+    result = TransactionSaveResult(transacao=_transacao(), status="nova")
+    assert result.pendencia is None

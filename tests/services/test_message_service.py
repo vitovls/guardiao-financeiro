@@ -1,8 +1,8 @@
-from datetime import date
+from datetime import date, datetime
 
 from models import DEFAULT_CATEGORIA, Transacao
-from repository.provider import TransactionSaveResult
-from services.message_service import format_message
+from repository.provider import PendingConfirmation, TransactionSaveResult
+from services.message_service import format_message, format_pending_message
 
 
 def _transacao(descricao="cafe", valor=8.0, tipo="saida", categoria="alimentacao"):
@@ -31,18 +31,20 @@ def test_format_message_duplicata_exata_shows_warning_and_excludes_from_totals()
 
     message = format_message(results)
 
-    assert "⚠️" in message
+    assert "⚠️" not in message
+    assert "🟡" in message
+    assert "aguardando sua confirmação" in message
     assert "Saídas: R$ 0.00" in message
 
 
-def test_format_message_suspeita_shows_marker_and_includes_in_totals():
+def test_format_message_suspeita_shows_marker_and_excludes_from_totals():
     results = [TransactionSaveResult(transacao=_transacao(valor=8.0, tipo="saida"), status="suspeita")]
 
     message = format_message(results)
 
     assert "🟡" in message
-    assert "parece semelhante" in message
-    assert "Saídas: R$ 8.00" in message
+    assert "aguardando sua confirmação" in message
+    assert "Saídas: R$ 0.00" in message
 
 
 def test_format_message_categoria_outros_shows_alert_note():
@@ -62,15 +64,15 @@ def test_format_message_categoria_preenchida_does_not_show_alert_note():
     assert "categoria não identificada" not in message
 
 
-def test_format_message_suspeita_e_categoria_outros_combina_as_duas_notas():
+def test_format_message_suspeita_does_not_show_categoria_note():
     results = [
         TransactionSaveResult(transacao=_transacao(categoria=DEFAULT_CATEGORIA), status="suspeita")
     ]
 
     message = format_message(results)
 
-    assert "parece semelhante" in message
-    assert "categoria não identificada" in message
+    assert "aguardando sua confirmação" in message
+    assert "categoria não identificada" not in message
 
 
 def test_format_message_valor_zero_shows_alert_note():
@@ -98,3 +100,36 @@ def test_format_message_categoria_outros_e_valor_zero_combina_as_duas_notas():
 
     assert "categoria não identificada" in message
     assert "valor não identificado" in message
+
+
+def test_format_pending_message_duplicata_exata_label():
+    now = datetime(2026, 6, 15, 12, 0, 0)
+    pendencia = PendingConfirmation(
+        id="abc", transacao=_transacao(), motivo="duplicata_exata", criado_em=now,
+    )
+    texto = format_pending_message(pendencia)
+    assert "lançamento idêntico" in texto
+    assert "Confirma que quer registrar mesmo assim?" in texto
+
+
+def test_format_pending_message_short_interval_suggests_double_send():
+    criado_em = datetime(2026, 6, 15, 12, 5, 0)
+    similar_criado_em = datetime(2026, 6, 15, 12, 0, 0)
+    pendencia = PendingConfirmation(
+        id="abc", transacao=_transacao(), motivo="suspeita",
+        criado_em=criado_em, similar_criado_em=similar_criado_em,
+    )
+    texto = format_pending_message(pendencia)
+    assert "pode ter sido sem querer" in texto
+
+
+def test_format_pending_message_long_interval_uses_neutral_text():
+    criado_em = datetime(2026, 6, 15, 18, 0, 0)
+    similar_criado_em = datetime(2026, 6, 15, 12, 0, 0)
+    pendencia = PendingConfirmation(
+        id="abc", transacao=_transacao(), motivo="suspeita",
+        criado_em=criado_em, similar_criado_em=similar_criado_em,
+    )
+    texto = format_pending_message(pendencia)
+    assert "Já existe um lançamento parecido registrado antes." in texto
+    assert "pode ter sido sem querer" not in texto

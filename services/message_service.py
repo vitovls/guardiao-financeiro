@@ -1,5 +1,9 @@
+from datetime import timedelta
+
 from models import DEFAULT_CATEGORIA
-from repository.provider import TransactionSaveResult
+from repository.provider import PendingConfirmation, TransactionSaveResult
+
+_JANELA_CURTA = timedelta(minutes=5)
 
 
 def split_message(text: str, limit: int = 4096) -> list[str]:
@@ -33,21 +37,19 @@ def format_message(results: list[TransactionSaveResult]) -> str:
 
     for r in results:
         t = r.transacao
-        if r.status == "duplicata_exata":
+        if r.status in ("suspeita", "duplicata_exata"):
             lines.append(
-                f"⚠️ {t.data.strftime('%d/%m/%Y')} — {t.descricao}: R$ {t.valor:.2f} "
-                "(não salva, já registrada — reenvie com alguma diferença se for uma compra real)"
+                f"🟡 {t.data.strftime('%d/%m/%Y')} — {t.descricao}: R$ {t.valor:.2f} "
+                "(aguardando sua confirmação, veja a mensagem abaixo)"
             )
             continue
 
-        emoji = "🟡" if r.status == "suspeita" else ("🟢" if t.tipo == "entrada" else "🔴")
+        emoji = "🟢" if t.tipo == "entrada" else "🔴"
         if t.tipo == "entrada":
             income_total += t.valor
         else:
             expense_total += t.valor
         notes = []
-        if r.status == "suspeita":
-            notes.append("parece semelhante a uma já registrada")
         if t.categoria == DEFAULT_CATEGORIA:
             notes.append(f'categoria não identificada, salva como "{DEFAULT_CATEGORIA}"')
         if t.valor == 0.0:
@@ -63,3 +65,20 @@ def format_message(results: list[TransactionSaveResult]) -> str:
     lines.append(f"💰 Saldo: R$ {balance:.2f}")
 
     return "\n".join(lines)
+
+
+def format_pending_message(pendencia: PendingConfirmation) -> str:
+    t = pendencia.transacao
+    motivo_label = "um lançamento idêntico" if pendencia.motivo == "duplicata_exata" else "um lançamento parecido"
+    linhas = [
+        f"🟡 Encontrei {motivo_label} ao tentar registrar:",
+        f"{t.data.strftime('%d/%m/%Y')} — {t.descricao}: R$ {t.valor:.2f}",
+    ]
+    if pendencia.similar_criado_em is not None:
+        intervalo = abs(pendencia.criado_em - pendencia.similar_criado_em)
+        if intervalo <= _JANELA_CURTA:
+            linhas.append("Foi enviado bem perto de um lançamento parecido — pode ter sido sem querer.")
+        else:
+            linhas.append("Já existe um lançamento parecido registrado antes.")
+    linhas.append("Confirma que quer registrar mesmo assim?")
+    return "\n".join(linhas)
