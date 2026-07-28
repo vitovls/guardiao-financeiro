@@ -22,6 +22,16 @@
         "arn:aws:bedrock:us-east-2::foundation-model/amazon.nova-lite-v1:0",
         "arn:aws:bedrock:us-west-2::foundation-model/amazon.nova-lite-v1:0"
       ]
+    },
+    {
+      "Sid": "S3ReadWriteDeleteFilesGuardiaoDev",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::guardiao-financeiro-files-dev-413948096391/*"
     }
   ]
 }

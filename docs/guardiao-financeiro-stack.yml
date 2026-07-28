@@ -29,10 +29,10 @@ Resources:
   # ---------------------------------------------------------------------
   # 1. Armazenamento de arquivos (fotos, PDFs recebidos via Telegram)
   # ---------------------------------------------------------------------
-  MyDataBucket:
+  MyFilesBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub 'guardiao-financeiro-dados-${Environment}-${AWS::AccountId}'
+      BucketName: !Sub 'guardiao-financeiro-files-${Environment}-${AWS::AccountId}'
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -42,6 +42,11 @@ Resources:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireObjectsAfterOneDay
+            Status: Enabled
+            ExpirationInDays: 1
 
   # ---------------------------------------------------------------------
   # 2. Banco de dados de transacoes
@@ -114,7 +119,7 @@ Resources:
                   - s3:PutObject
                   - s3:GetObject
                   - s3:DeleteObject
-                Resource: !Sub '${MyDataBucket.Arn}/*'
+                Resource: !Sub '${MyFilesBucket.Arn}/*'
 
               - Effect: Allow
                 Action: bedrock:InvokeModel
@@ -363,13 +368,13 @@ Resources:
             }
           }
         - TabelaNome: !Ref MyDynamoDBTable
-          BucketNome: !Ref MyDataBucket
+          BucketNome: !Ref MyFilesBucket
           ModeloTexto: !Ref BedrockTextModelArn
           ModeloOcr: !Ref BedrockOcrModelArn
 
 Outputs:
   BucketName:
-    Value: !Ref MyDataBucket
+    Value: !Ref MyFilesBucket
   TableName:
     Value: !Ref MyDynamoDBTable
   StateMachineArn:

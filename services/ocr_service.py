@@ -6,17 +6,7 @@ from services.llm.factory import get_llm_provider
 _provider = get_llm_provider()
 
 
-async def extract_photo_data(image_path: str) -> list[Transacao]:
-    with open(image_path, "rb") as f:
-        file_bytes = f.read()
-
-    if image_path.endswith(".jpg"):
-        mime_type = "image/jpeg"
-    elif image_path.endswith(".pdf"):
-        mime_type = "application/pdf"
-    else:
-        raise ValueError(f"Formato não suportado: {image_path}")
-
+async def extract_document_data(file_bytes: bytes, mime_type: str) -> list[Transacao]:
     try:
         return await _provider.extract_document_transactions(file_bytes, mime_type)
     except Exception as exc:
