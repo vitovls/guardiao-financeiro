@@ -1,12 +1,12 @@
 from datetime import date
 
-from models import Transacao
+from models import DEFAULT_CATEGORIA, Transacao
 from repository.provider import TransactionSaveResult
 from services.message_service import format_message
 
 
-def _transacao(descricao="cafe", valor=8.0, tipo="saida"):
-    return Transacao(data=date(2026, 6, 15), descricao=descricao, valor=valor, tipo=tipo, categoria="alimentacao")
+def _transacao(descricao="cafe", valor=8.0, tipo="saida", categoria="alimentacao"):
+    return Transacao(data=date(2026, 6, 15), descricao=descricao, valor=valor, tipo=tipo, categoria=categoria)
 
 
 def test_format_message_empty_list_returns_no_transaction_message():
@@ -43,3 +43,31 @@ def test_format_message_suspeita_shows_marker_and_includes_in_totals():
     assert "🟡" in message
     assert "parece semelhante" in message
     assert "Saídas: R$ 8.00" in message
+
+
+def test_format_message_categoria_outros_shows_alert_note():
+    results = [TransactionSaveResult(transacao=_transacao(categoria=DEFAULT_CATEGORIA), status="nova")]
+
+    message = format_message(results)
+
+    assert "categoria não identificada" in message
+    assert DEFAULT_CATEGORIA in message
+
+
+def test_format_message_categoria_preenchida_does_not_show_alert_note():
+    results = [TransactionSaveResult(transacao=_transacao(categoria="alimentacao"), status="nova")]
+
+    message = format_message(results)
+
+    assert "categoria não identificada" not in message
+
+
+def test_format_message_suspeita_e_categoria_outros_combina_as_duas_notas():
+    results = [
+        TransactionSaveResult(transacao=_transacao(categoria=DEFAULT_CATEGORIA), status="suspeita")
+    ]
+
+    message = format_message(results)
+
+    assert "parece semelhante" in message
+    assert "categoria não identificada" in message

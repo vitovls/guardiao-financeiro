@@ -49,9 +49,8 @@ class DynamoTransactionRepository(TransactionRepository):
             "descricao": t.descricao,
             "valor": Decimal(str(t.valor)),
             "tipo": t.tipo,
+            "categoria": t.categoria,
         }
-        if t.categoria:
-            item["categoria"] = t.categoria
         try:
             self._table.put_item(
                 Item=item,

@@ -37,19 +37,6 @@ def _item(t: Transacao, sort_key: str | None = None) -> dict:
     }
 
 
-async def test_save_transaction_with_empty_categoria_omits_attribute_from_item():
-    resource, table = Mock(), Mock()
-    resource.Table.return_value = table
-    t = _transacao(categoria="")
-    table.query.return_value = {"Items": []}
-
-    repo = DynamoTransactionRepository(table_name="tbl", resource=resource)
-    await repo.save_transactions([t], 1)
-
-    item = table.put_item.call_args.kwargs["Item"]
-    assert "categoria" not in item
-
-
 async def test_save_transaction_with_categoria_includes_attribute_in_item():
     resource, table = Mock(), Mock()
     resource.Table.return_value = table

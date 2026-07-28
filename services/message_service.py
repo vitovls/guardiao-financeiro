@@ -1,3 +1,4 @@
+from models import DEFAULT_CATEGORIA
 from repository.provider import TransactionSaveResult
 
 
@@ -44,7 +45,12 @@ def format_message(results: list[TransactionSaveResult]) -> str:
             income_total += t.valor
         else:
             expense_total += t.valor
-        note = " (parece semelhante a uma já registrada)" if r.status == "suspeita" else ""
+        notes = []
+        if r.status == "suspeita":
+            notes.append("parece semelhante a uma já registrada")
+        if t.categoria == DEFAULT_CATEGORIA:
+            notes.append(f'categoria não identificada, salva como "{DEFAULT_CATEGORIA}"')
+        note = f" ({'; '.join(notes)})" if notes else ""
         lines.append(f"{emoji} {t.data.strftime('%d/%m/%Y')} — {t.descricao}: R$ {t.valor:.2f}{note}")
 
     balance = income_total - expense_total
