@@ -5,6 +5,18 @@
 
 ---
 
+## Status da migração (atualização — 2026-07-28)
+
+**Fases 0-3 concluídas e confirmadas em produção**, verificado no código: `services/llm/bedrock_provider.py`, `services/storage/s3_provider.py`, `repository/dynamo_repository.py`, e as flags `LLM_PROVIDER` / `STORAGE_BACKEND` / `DB_BACKEND` em `run_polling/config.py`. O bot já roda com Bedrock, S3 e DynamoDB por baixo — ainda como monólito, com `run_polling` e deploy via `git pull` na EC2.
+
+**Fase 4 e Fase 5 arquivadas.** Decisão tomada por avaliação de complexidade vs. benefício — não por dificuldade de execução. Para um bot pessoal de baixo volume, o ganho de custo/confiabilidade de webhook + Lambda + Step Functions é marginal, enquanto o custo operacional é concreto: múltiplos recursos AWS para coordenar, ferramenta de deploy dedicada, perda do ciclo `python main.py` + Telegram direto para testar (Telegram não permite webhook e polling simultâneos no mesmo bot token), depuração distribuída entre Lambdas. A arquitetura híbrida atual (compute simples em EC2 sobre serviços gerenciados) já resolve as limitações reais que motivaram a migração — durabilidade do banco, arquivos fora do disco local, dependência do Gemini — sem pagar esse preço. **EC2 + `git pull` continua sendo o modelo de deploy daqui pra frente.**
+
+**Fase 6 é a próxima fase a implementar.** Com Fase 4/5 arquivadas, ela não depende delas — só da Fase 3 (DynamoDB), já concluída. Existe uma branch/worktree (`feature/nlp-query-totals`) com trabalho relacionado (`query_service`, roteamento por intent, totais por período), mas é um trabalho **anterior e independente** desta migração — não é uma tentativa parada da Fase 6 — e pode servir de referência/ponto de partida ao retomar.
+
+**Branch da Fase 6:** `feat/fluxo-consulta` (criada a partir de `feat/confirmacao-duplicata-exata`, ainda não mergeada em `main` — pendência anterior, não relacionada a esta fase).
+
+---
+
 ## 1. Estado atual (o que já funciona)
 
 ```
@@ -172,7 +184,7 @@ A fase mais delicada, porque toca a dedup. Ainda monólito.
 
 **Critério de saída:** SQLite desligado, dedup funcionando igual (mesmos 3 estados, mesmos resultados nos mesmos casos de teste), dados históricos migrados.
 
-### Fase 4 — Listener: polling → webhook + Lambda
+### Fase 4 — Listener: polling → webhook + Lambda `[ARQUIVADA — ver "Status da migração"]`
 
 Agora sim o monólito pode ser desmontado, porque nada mais depende do disco/processo da EC2.
 
@@ -188,7 +200,7 @@ Agora sim o monólito pode ser desmontado, porque nada mais depende do disco/pro
 
 **Critério de saída:** bot 100% event-driven, EC2 ociosa (pode parar a instância e o bot continua funcionando).
 
-### Fase 5 — Step Functions: orquestração explícita
+### Fase 5 — Step Functions: orquestração explícita `[ARQUIVADA — ver "Status da migração"]`
 
 Quebrar a Lambda processadora nos states do desenho alvo.
 
@@ -202,7 +214,7 @@ Quebrar a Lambda processadora nos states do desenho alvo.
 
 **Critério de saída:** cada mensagem gera uma execução visível no console do Step Functions, com trilha completa de auditoria por transação.
 
-### Fase 6 — Fluxo de consulta (feature nova sobre a fundação pronta)
+### Fase 6 — Fluxo de consulta (feature nova sobre a fundação pronta) `[PRÓXIMA FASE — ver "Status da migração"]`
 
 Intencionalmente por último: construir consulta antes da Fase 3 significaria escrevê-la duas vezes (SQL e depois DynamoDB).
 
@@ -275,9 +287,9 @@ Fase 0 (credenciais + model access)
 - [ ] Documentar decisão em docs/decisoes-arquiteturais.md
 - [ ] (pós-estabilidade) Desligar SQLite
 
-### Fase 4 — polling → webhook
+### Fase 4 — polling → webhook `[ARQUIVADA]`
 - [ ] Adaptador de parse: JSON cru do webhook → objetos internos (Update.de_json)
-- [ ] Empacotar core como Lambda processadora (invocação assíncrona)
+- [ ] Empacotar core como Lambda proc essadora (invocação assíncrona)
 - [ ] API Gateway HTTP API com rota POST /webhook
 - [ ] Lambda receptora: validação do secret token (403 se ausente/errado)
 - [ ] Idempotência por update_id (DynamoDB com TTL)
@@ -285,14 +297,14 @@ Fase 0 (credenciais + model access)
 - [ ] setWebhook com secret token; desligar run_polling
 - [ ] EC2 parada como validação (bot segue de pé)
 
-### Fase 5 — Step Functions
+### Fase 5 — Step Functions `[ARQUIVADA]`
 - [ ] Separar states nativos (Bedrock/DynamoDB/S3) de Lambdas (validação, normalização, resposta)
 - [ ] Implementar state machine com: Default+Fail na Choice, state de dedup, state Responder Telegram, Catch→Notifica Erro em todos os Tasks
 - [ ] Receptora passa a chamar StartExecution
 - [ ] Evoluir o CloudFormation para deploy real (incluir API GW, Lambdas, DLQ, EventBridge Connection) ou decidir migração para SAM
 - [ ] Desligar EC2 definitivamente
 
-### Fase 6 — Consultas
+### Fase 6 — Consultas `[PRÓXIMA FASE]`
 - [ ] Classificação transação × consulta no prompt do Nova Micro
 - [ ] Extração de filtros estruturados (período, categoria) da pergunta
 - [ ] Query/agregação na tabela e GSI + formatação de resposta
