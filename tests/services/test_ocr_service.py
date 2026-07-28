@@ -1,4 +1,3 @@
-import os
 from datetime import date
 
 from models import Transacao
@@ -14,7 +13,7 @@ def _fake_transacao() -> Transacao:
     )
 
 
-async def test_extract_photo_data_returns_provider_result(monkeypatch, tmp_path):
+async def test_extract_document_data_returns_provider_result(monkeypatch):
     import services.ocr_service as ocr_service
 
     expected = [_fake_transacao()]
@@ -25,15 +24,12 @@ async def test_extract_photo_data_returns_provider_result(monkeypatch, tmp_path)
 
     monkeypatch.setattr(ocr_service, "_provider", _FakeProvider())
 
-    image_path = tmp_path / "recibo.jpg"
-    image_path.write_bytes(b"fake-bytes")
-
-    result = await ocr_service.extract_photo_data(str(image_path))
+    result = await ocr_service.extract_document_data(b"fake-bytes", "image/jpeg")
 
     assert result == expected
 
 
-async def test_extract_photo_data_returns_empty_list_when_provider_raises(monkeypatch, tmp_path):
+async def test_extract_document_data_returns_empty_list_when_provider_raises(monkeypatch):
     import services.ocr_service as ocr_service
 
     class _FailingProvider:
@@ -42,9 +38,6 @@ async def test_extract_photo_data_returns_empty_list_when_provider_raises(monkey
 
     monkeypatch.setattr(ocr_service, "_provider", _FailingProvider())
 
-    image_path = tmp_path / "recibo.jpg"
-    image_path.write_bytes(b"fake-bytes")
-
-    result = await ocr_service.extract_photo_data(str(image_path))
+    result = await ocr_service.extract_document_data(b"fake-bytes", "image/jpeg")
 
     assert result == []

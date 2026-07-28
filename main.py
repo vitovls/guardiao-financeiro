@@ -1,5 +1,4 @@
 import asyncio
-import os
 
 from telegram.ext import Application, MessageHandler, filters
 
@@ -12,7 +11,6 @@ from database.connection import init_db
 
 def main():
     asyncio.run(init_db())
-    os.makedirs("fotos", exist_ok=True)
 
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT, get_message))
