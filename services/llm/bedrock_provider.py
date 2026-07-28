@@ -12,7 +12,7 @@ from prompts import build_document_extraction_prompt, build_text_extraction_prom
 from services.llm.provider import BedrockOutputError, LLMProvider
 
 REGION = "us-east-2"
-TEXT_MODEL_ID = "us.amazon.nova-lite-v1:0"
+TEXT_MODEL_ID = "us.meta.llama4-maverick-17b-instruct-v1:0"
 DOCUMENT_MODEL_ID = "us.meta.llama4-maverick-17b-instruct-v1:0"
 
 _MIME_TO_IMAGE_FORMAT = {"image/jpeg": "jpeg"}
