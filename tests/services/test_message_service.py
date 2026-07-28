@@ -71,3 +71,30 @@ def test_format_message_suspeita_e_categoria_outros_combina_as_duas_notas():
 
     assert "parece semelhante" in message
     assert "categoria não identificada" in message
+
+
+def test_format_message_valor_zero_shows_alert_note():
+    results = [TransactionSaveResult(transacao=_transacao(valor=0.0), status="nova")]
+
+    message = format_message(results)
+
+    assert "valor não identificado" in message
+
+
+def test_format_message_valor_diferente_de_zero_does_not_show_alert_note():
+    results = [TransactionSaveResult(transacao=_transacao(valor=8.0), status="nova")]
+
+    message = format_message(results)
+
+    assert "valor não identificado" not in message
+
+
+def test_format_message_categoria_outros_e_valor_zero_combina_as_duas_notas():
+    results = [
+        TransactionSaveResult(transacao=_transacao(categoria=DEFAULT_CATEGORIA, valor=0.0), status="nova")
+    ]
+
+    message = format_message(results)
+
+    assert "categoria não identificada" in message
+    assert "valor não identificado" in message

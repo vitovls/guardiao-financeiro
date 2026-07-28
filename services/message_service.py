@@ -50,6 +50,8 @@ def format_message(results: list[TransactionSaveResult]) -> str:
             notes.append("parece semelhante a uma já registrada")
         if t.categoria == DEFAULT_CATEGORIA:
             notes.append(f'categoria não identificada, salva como "{DEFAULT_CATEGORIA}"')
+        if t.valor == 0.0:
+            notes.append("valor não identificado, revise")
         note = f" ({'; '.join(notes)})" if notes else ""
         lines.append(f"{emoji} {t.data.strftime('%d/%m/%Y')} — {t.descricao}: R$ {t.valor:.2f}{note}")
 
