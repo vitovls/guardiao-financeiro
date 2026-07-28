@@ -11,10 +11,20 @@ class RepositoryError(Exception):
     """Erro genérico de repository, tratado pelos services (nunca vaza driver nativo)."""
 
 
+class PendingConfirmation(BaseModel):
+    id: str
+    transacao: Transacao
+    motivo: Literal["duplicata_exata", "suspeita"]
+    similares: list[Transacao] = []
+    criado_em: datetime
+    similar_criado_em: datetime | None = None
+
+
 class TransactionSaveResult(BaseModel):
     transacao: Transacao
     status: Literal["nova", "suspeita", "duplicata_exata"]
     similares: list[Transacao] = []
+    pendencia: PendingConfirmation | None = None
 
 
 class ConfigItem(BaseModel):
