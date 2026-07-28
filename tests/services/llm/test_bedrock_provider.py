@@ -107,6 +107,54 @@ async def test_extract_text_transactions_sets_max_tokens_to_avoid_truncation():
     assert call_kwargs["inferenceConfig"]["maxTokens"] > 2000
 
 
+async def test_extract_text_transactions_parses_response_wrapped_in_json_markdown_fence():
+    response_text = json.dumps(
+        {
+            "e_transacao": True,
+            "transacoes": [
+                {
+                    "data": "2026-07-26",
+                    "descricao": "mercado",
+                    "valor": 30.0,
+                    "tipo": "saida",
+                    "categoria": "alimentacao",
+                }
+            ],
+        }
+    )
+    client = _mock_client("```json\n" + response_text + "\n```")
+    provider = BedrockProvider(client=client)
+
+    result = await provider.extract_text_transactions("gastei 30 no mercado")
+
+    assert len(result) == 1
+    assert result[0].descricao == "mercado"
+
+
+async def test_extract_text_transactions_parses_response_wrapped_in_bare_markdown_fence():
+    response_text = json.dumps(
+        {
+            "e_transacao": True,
+            "transacoes": [
+                {
+                    "data": "2026-07-26",
+                    "descricao": "mercado",
+                    "valor": 30.0,
+                    "tipo": "saida",
+                    "categoria": "alimentacao",
+                }
+            ],
+        }
+    )
+    client = _mock_client("```\n" + response_text + "\n```")
+    provider = BedrockProvider(client=client)
+
+    result = await provider.extract_text_transactions("gastei 30 no mercado")
+
+    assert len(result) == 1
+    assert result[0].descricao == "mercado"
+
+
 async def test_extract_document_transactions_unsupported_mime_raises_value_error():
     client = _mock_client(json.dumps([]))
     provider = BedrockProvider(client=client)
