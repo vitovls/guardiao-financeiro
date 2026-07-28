@@ -35,6 +35,6 @@ async def get_photo(update, context):
         except Exception as exc:
             print(f"[photo_handler] falha ao deletar {key} do storage: {exc}", file=sys.stderr)
 
-    await save_transactions(transactions, user_id)
-    message = format_message(transactions)
+    results = await save_transactions(transactions, user_id)
+    message = format_message(results)
     await update.message.reply_text(message, parse_mode="HTML")

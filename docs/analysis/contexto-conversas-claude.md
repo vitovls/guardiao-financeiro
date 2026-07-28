@@ -107,6 +107,7 @@ O que atravessa todas as conversas e não pode ser violado em nenhuma fase:
 6. Complexidade só quando necessária (sem RabbitMQ, sem LangChain, sem abstrações sem segunda implementação real).
 7. Regras do agente em arquivo editável pelo usuário (estilo CLAUDE.md).
 8. `Transacao` (DTO) separado de entidade de persistência.
+9. Toda configuração (orçamento/baldes e qualquer outra do mesmo tipo) precisa ser explicitamente mostrada ao usuário, com aprovação, antes de qualquer escrita — nenhuma mudança de configuração é persistida sem confirmação. **[decisão]** registrada em `docs/analysis/INV004-sqlite-para-dynamodb.md`, aplicável a partir da Fase 6b (agente de conselho), quando o fluxo de leitura/escrita de configuração via conversa for construído.
 
 ## Links das conversas
 

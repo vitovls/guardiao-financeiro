@@ -32,8 +32,10 @@ async def test_happy_path_uploads_extracts_deletes_and_replies(monkeypatch):
 
     extract_document_data = AsyncMock(return_value=["transacao-fake"])
     monkeypatch.setattr(photo_handler, "extract_document_data", extract_document_data)
-    monkeypatch.setattr(photo_handler, "save_transactions", AsyncMock())
-    monkeypatch.setattr(photo_handler, "format_message", Mock(return_value="mensagem formatada"))
+    save_transactions = AsyncMock(return_value=["resultado-fake"])
+    monkeypatch.setattr(photo_handler, "save_transactions", save_transactions)
+    format_message = Mock(return_value="mensagem formatada")
+    monkeypatch.setattr(photo_handler, "format_message", format_message)
 
     await photo_handler.get_photo(update, context)
 
@@ -45,6 +47,8 @@ async def test_happy_path_uploads_extracts_deletes_and_replies(monkeypatch):
     extract_document_data.assert_awaited_once_with(b"fake-bytes", "image/jpeg")
     storage.delete.assert_awaited_once_with("files/42-123-abc123.jpg")
 
+    save_transactions.assert_awaited_once_with(["transacao-fake"], 42)
+    format_message.assert_called_once_with(["resultado-fake"])
     update.message.reply_text.assert_any_call("mensagem formatada", parse_mode="HTML")
 
 

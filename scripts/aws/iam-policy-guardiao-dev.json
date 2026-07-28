@@ -32,6 +32,19 @@
         "s3:DeleteObject"
       ],
       "Resource": "arn:aws:s3:::guardiao-financeiro-files-dev-413948096391/*"
+    },
+    {
+      "Sid": "DynamoDBReadWriteTransacoesGuardiaoDev",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:Query"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:us-east-2:413948096391:table/GuardiaoFinanceiro-Transacoes-dev",
+        "arn:aws:dynamodb:us-east-2:413948096391:table/GuardiaoFinanceiro-Transacoes-dev/index/*"
+      ]
     }
   ]
 }

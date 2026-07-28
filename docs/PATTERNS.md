@@ -71,3 +71,27 @@ Sem `__init__.py` em `tests/` (padrão do projeto), o modo de import padrão do 
 ### Test runner do projeto: pytest + pytest-asyncio
 
 Primeira introdução de test runner (antes disso, nenhum configurado). `pytest==9.1.1` + `pytest-asyncio==1.4.0` (`pytest.ini` com `asyncio_mode = auto`, sem precisar marcar cada teste assíncrono manualmente). Testes ficam em `tests/`, espelhando a estrutura de `services/` (ex.: `services/llm/bedrock_provider.py` → `tests/services/llm/test_bedrock_provider.py`), sem `__init__.py` (mesmo padrão de namespace implícito já usado em `services/`/`handlers/`/`repository/`). Toda task nova que envolva lógica pura (parsing, validação, retry) deve ter teste automatizado seguindo TDD; chamadas reais a APIs externas (LLM, AWS) nunca entram em teste automatizado — só em cenários de teste manual. Origem: `docs/tasks/TASKS004-gemini-para-bedrock.md`.
+
+### `TransactionRepository` ganha segunda implementação real (DynamoDB) — mesmo padrão de troca de provedor externo
+
+`SqliteTransactionRepository`/`DynamoTransactionRepository` (flag `DB_BACKEND=sqlite|dynamo`) reaplicam o padrão interface+factory já usado por `LLMProvider`/`StorageProvider`. Diferença notável: a sessão SQLAlchemy deixou de ser injetada no construtor (quebrava o padrão "uma instância reutilizável do factory") — `SqliteTransactionRepository` agora abre sua própria sessão por operação via `session_factory` injetável. Origem: `docs/analysis/INV004-sqlite-para-dynamodb.md` / `docs/tasks/TASKS006-sqlite-para-dynamodb.md`.
+
+### Dedup determinística: fingerprint no `sortKey`, nunca em atributo próprio
+
+`sortKey = "{data ISO}#{sha256(valor+tipo+descrição normalizada)[:16]}"`. Qualquer código futuro que escreva transações (ex. um eventual importador, ou a Fase 6b) deve passar pelas funções puras de `repository/dedup.py` (`normalize_description`, `compute_fingerprint`, `is_similar`), nunca reimplementar a checagem. DUPLICATA_EXATA sempre bloqueia e nunca insere/descarta silenciosamente, mesmo em casos legítimos (ex. duas compras idênticas no mesmo dia) — decisão de produto deliberada, sem tratamento de adjacência/posição no lote. Origem: `docs/specs/SPEC006-sqlite-para-dynamodb.md` (B1-B3b) / `docs/tasks/TASKS006-sqlite-para-dynamodb.md`.
+
+### `BatchWriteItem` do DynamoDB não suporta `ConditionExpression`
+
+Qualquer escrita em lote no DynamoDB que precise de dedup (ou qualquer outra condição por item) usa `PutItem` individual condicional, nunca `boto3`'s `Table.batch_writer()` — a API `BatchWriteItem` não aceita condição por item. Vale para `DynamoTransactionRepository.save_transactions` e para `scripts/migrate_sqlite_to_dynamo.py`. Origem: `docs/plans/PLN006-sqlite-para-dynamodb.md`.
+
+### `Query` por faixa de data num `sortKey` composto precisa de sentinela no limite superior
+
+`sortKey` no formato `"{data}#{sufixo}"` não aceita um `BETWEEN`/`Key(...).between(...)` ingênuo com a data pura como limite superior — perde itens do último dia cujo sufixo ordena depois do que seria comparado. Usar um sentinela alto (`"{data_final}#￿"`) como limite superior. Vale para qualquer `Query` futura sobre essa tabela (busca de SUSPEITA, `get_totals_by_period`, e qualquer relatório futuro por período). Origem: `docs/plans/PLN006-sqlite-para-dynamodb.md`.
+
+### Configuração (orçamento/dívida) é um único tipo de Item, sem ABC de repository
+
+`ConfigItem`/`ConfigRepository` (`sortKey = "CONFIG#{nome}"`, campo `periodo` distingue balde recorrente de dívida sem-reset) — mesmo *shape*, confirmado por pesquisa de mercado (YNAB modela debt payoff na mesma estrutura de categoria/envelope, mudando só o *target type*). Saldo nunca é armazenado, sempre derivado de `get_totals_by_period`. `ConfigRepository` é uma classe concreta sem `ABC`/`Protocol` — só existe uma implementação real (Dynamo), mesma regra de `repository/` até hoje. A Fase 6b (agente de conselho) não deve redecidir esse formato do zero. Origem: `docs/analysis/INV004-sqlite-para-dynamodb.md`, `docs/specs/SPEC006-sqlite-para-dynamodb.md`.
+
+### `Transacao.categoria` nunca fica vazia — `DEFAULT_CATEGORIA = "outros"` garantido no DTO
+
+`models.Transacao` tem um `field_validator` que converte `categoria` vazia (ou omitida) para `DEFAULT_CATEGORIA` ("outros"), incondicionalmente — vale para toda instância criada em qualquer parte do sistema (extração via LLM, leitura de `SqliteTransactionRepository`/`DynamoTransactionRepository`, migração). Por isso nenhum código downstream (repository, `message_service`) precisa (nem deve) validar/tratar `categoria == ""` de novo — é uma garantia estrutural do DTO, não um caso de borda a checar em cada consumidor. `services/message_service.py::format_message` avisa o usuário inline quando a categoria caiu no fallback ("categoria não identificada, salva como 'outros'"), sem fluxo de pergunta-e-espera-resposta (mesmo princípio "sem estado" de `SPEC006`). Editar a categoria depois de salva é feature separada, não implementada — ver `docs/analysis/CONTEXT003-editar-categoria-transacao.md`. Origem: discussão de produto durante `TASKS006-sqlite-para-dynamodb.md`.

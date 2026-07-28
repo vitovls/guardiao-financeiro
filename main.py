@@ -5,12 +5,13 @@ from telegram.ext import Application, MessageHandler, filters
 from handlers.pdf_handler import get_pdf
 from handlers.photo_handler import get_photo
 from handlers.text_handler import get_message
-from run_polling.config import BOT_TOKEN
+from run_polling.config import BOT_TOKEN, DB_BACKEND
 from database.connection import init_db
 
 
 def main():
-    asyncio.run(init_db())
+    if DB_BACKEND == "sqlite":
+        asyncio.run(init_db())
 
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT, get_message))
