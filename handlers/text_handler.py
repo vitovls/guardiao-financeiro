@@ -18,8 +18,8 @@ async def get_message(update: Update, context: ContextTypes):
         )
         return
 
-    await save_transactions(transactions, user_id)
+    results = await save_transactions(transactions, user_id)
 
-    msg = format_message(transactions)
+    msg = format_message(results)
     for block in split_message(msg):
         await update.message.reply_text(block, parse_mode="HTML")

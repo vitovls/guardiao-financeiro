@@ -1,4 +1,4 @@
-from models import Transacao
+from repository.provider import TransactionSaveResult
 
 
 def split_message(text: str, limit: int = 4096) -> list[str]:
@@ -22,21 +22,30 @@ def split_message(text: str, limit: int = 4096) -> list[str]:
     return block
 
 
-def format_message(transactions: list[Transacao]) -> str:
-    if not transactions:
+def format_message(results: list[TransactionSaveResult]) -> str:
+    if not results:
         return "Não encontrei nenhuma transação nessa imagem."
 
     lines = ["<b>📊 Extrato processado</b>", ""]
     income_total = 0.0
     expense_total = 0.0
 
-    for t in transactions:
-        emoji = "🟢" if t.tipo == "entrada" else "🔴"
+    for r in results:
+        t = r.transacao
+        if r.status == "duplicata_exata":
+            lines.append(
+                f"⚠️ {t.data.strftime('%d/%m/%Y')} — {t.descricao}: R$ {t.valor:.2f} "
+                "(não salva, já registrada — reenvie com alguma diferença se for uma compra real)"
+            )
+            continue
+
+        emoji = "🟡" if r.status == "suspeita" else ("🟢" if t.tipo == "entrada" else "🔴")
         if t.tipo == "entrada":
             income_total += t.valor
         else:
             expense_total += t.valor
-        lines.append(f"{emoji} {t.data.strftime('%d/%m/%Y')} — {t.descricao}: R$ {t.valor:.2f}")
+        note = " (parece semelhante a uma já registrada)" if r.status == "suspeita" else ""
+        lines.append(f"{emoji} {t.data.strftime('%d/%m/%Y')} — {t.descricao}: R$ {t.valor:.2f}{note}")
 
     balance = income_total - expense_total
     lines.append("")

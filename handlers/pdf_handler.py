@@ -38,7 +38,7 @@ async def get_pdf(update: Update, context):
         except Exception as exc:
             print(f"[pdf_handler] falha ao deletar {key} do storage: {exc}", file=sys.stderr)
 
-    await save_transactions(transactions, user_id)
-    msg = format_message(transactions)
+    results = await save_transactions(transactions, user_id)
+    msg = format_message(results)
     for block in split_message(msg):
         await update.message.reply_text(block, parse_mode="HTML")
