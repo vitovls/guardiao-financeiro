@@ -11,7 +11,8 @@ venv/
 # Banco de dados
 *.db
 
-# Fotos recebidas pelo bot
+# Arquivos (fotos/PDFs) recebidos pelo bot, salvos localmente quando STORAGE_BACKEND=local
+files/
 fotos/
 
 # IDEs
