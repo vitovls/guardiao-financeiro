@@ -12,7 +12,7 @@ from prompts import build_document_extraction_prompt, build_text_extraction_prom
 from services.llm.provider import BedrockOutputError, LLMProvider
 
 REGION = "us-east-2"
-TEXT_MODEL_ID = "us.amazon.nova-micro-v1:0"
+TEXT_MODEL_ID = "us.amazon.nova-lite-v1:0"
 DOCUMENT_MODEL_ID = "us.amazon.nova-lite-v1:0"
 
 _MIME_TO_IMAGE_FORMAT = {"image/jpeg": "jpeg"}
@@ -50,6 +50,16 @@ async def _converse_with_retry(client, model_id: str, messages: list[dict]) -> s
 
         cap = _BASE_INTERVAL_SECONDS * (_BACKOFF_RATE**attempt)
         await asyncio.sleep(random.uniform(0, cap))
+
+
+def _strip_markdown_fence(text: str) -> str:
+    text = text.strip()
+    if not text.startswith("```"):
+        return text
+    text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+    if text.endswith("```"):
+        text = text[:-3]
+    return text.strip()
 
 
 class BedrockProvider(LLMProvider):
@@ -93,7 +103,7 @@ class BedrockProvider(LLMProvider):
         for attempt in range(2):
             text = await _converse_with_retry(self._client, model_id, messages)
             try:
-                response_data = json.loads(text)
+                response_data = json.loads(_strip_markdown_fence(text))
                 return parse_fn(response_data)
             except (json.JSONDecodeError, KeyError, ValidationError):
                 if attempt == 1:
