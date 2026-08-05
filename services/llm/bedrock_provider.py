@@ -8,8 +8,8 @@ from botocore.exceptions import ClientError, ConnectTimeoutError, ReadTimeoutErr
 from pydantic import ValidationError
 
 from models import Transacao
-from prompts import build_document_extraction_prompt, build_text_extraction_prompt
-from services.llm.provider import BedrockOutputError, LLMProvider
+from prompts import build_document_extraction_prompt, build_text_interpretation_prompt
+from services.llm.provider import BedrockOutputError, InterpretacaoTexto, LLMProvider
 
 REGION = "us-east-2"
 TEXT_MODEL_ID = "us.meta.llama4-maverick-17b-instruct-v1:0"
@@ -72,10 +72,10 @@ class BedrockProvider(LLMProvider):
     def __init__(self, client=None):
         self._client = client or boto3.client("bedrock-runtime", region_name=REGION)
 
-    async def extract_text_transactions(self, text: str) -> list[Transacao]:
-        prompt = build_text_extraction_prompt(date.today().isoformat(), text)
+    async def interpret_text(self, text: str) -> InterpretacaoTexto:
+        prompt = build_text_interpretation_prompt(date.today().isoformat(), text)
         messages = [{"role": "user", "content": [{"text": prompt}]}]
-        return await self._call_with_malformed_retry(TEXT_MODEL_ID, messages, self._parse_text_response)
+        return await self._call_with_malformed_retry(TEXT_MODEL_ID, messages, self._parse_interpretation_response)
 
     async def extract_document_transactions(self, file_bytes: bytes, mime_type: str) -> list[Transacao]:
         label = "PDF" if mime_type in _MIME_TO_DOCUMENT_FORMAT else "imagem"
@@ -86,10 +86,8 @@ class BedrockProvider(LLMProvider):
             DOCUMENT_MODEL_ID, messages, self._parse_document_response, temperature=0.0
         )
 
-    def _parse_text_response(self, response_data: dict) -> list[Transacao]:
-        if not response_data.get("e_transacao"):
-            return []
-        return [Transacao(**item) for item in response_data["transacoes"]]
+    def _parse_interpretation_response(self, response_data: dict) -> InterpretacaoTexto:
+        return InterpretacaoTexto(**response_data)
 
     def _parse_document_response(self, response_data: list) -> list[Transacao]:
         return [Transacao(**item) for item in response_data]

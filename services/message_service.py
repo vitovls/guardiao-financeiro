@@ -1,9 +1,15 @@
-from datetime import timedelta
+from datetime import date, timedelta
 
 from models import DEFAULT_CATEGORIA
 from repository.provider import PendingConfirmation, TransactionSaveResult
 
 _JANELA_CURTA = timedelta(minutes=5)
+
+_MESES_PT = {
+    1: "janeiro", 2: "fevereiro", 3: "março", 4: "abril",
+    5: "maio", 6: "junho", 7: "julho", 8: "agosto",
+    9: "setembro", 10: "outubro", 11: "novembro", 12: "dezembro",
+}
 
 
 def split_message(text: str, limit: int = 4096) -> list[str]:
@@ -82,3 +88,50 @@ def format_pending_message(pendencia: PendingConfirmation) -> str:
             linhas.append("Já existe um lançamento parecido registrado antes.")
     linhas.append("Confirma que quer registrar mesmo assim?")
     return "\n".join(linhas)
+
+
+def _periodo_label(start: date, end: date) -> str:
+    if start.month == end.month and start.year == end.year:
+        return f"{_MESES_PT[start.month]}/{start.year}"
+    return f"{start.strftime('%d/%m/%Y')} a {end.strftime('%d/%m/%Y')}"
+
+
+def format_no_intent_message() -> str:
+    return (
+        "Não identifiquei uma transação nem uma consulta nessa mensagem."
+        " Tente algo como 'Gastei 30 reais no mercado' ou 'Quanto gastei esse mês?'"
+    )
+
+
+def format_missing_period_message() -> str:
+    return "Qual período você quer consultar? Ex: 'esse mês', 'junho', 'este ano'."
+
+
+def format_query_message(start: date, end: date, categoria: str | None, totals: dict[str, float]) -> str:
+    periodo = _periodo_label(start, end)
+    entradas = totals["entradas"]
+    saidas = totals["saidas"]
+
+    if categoria:
+        if entradas == 0.0 and saidas == 0.0:
+            return f'Você não teve nenhuma transação em "{categoria}" em {periodo}.'
+        if saidas and not entradas:
+            return f'Você gastou R$ {saidas:.2f} em "{categoria}" em {periodo}.'
+        if entradas and not saidas:
+            return f'Você recebeu R$ {entradas:.2f} em "{categoria}" em {periodo}.'
+        return (
+            f'Em "{categoria}" em {periodo}:\n'
+            f"🟢 Entradas: R$ {entradas:.2f}\n"
+            f"🔴 Saídas: R$ {saidas:.2f}"
+        )
+
+    if entradas == 0.0 and saidas == 0.0:
+        return f"Você não teve nenhuma transação em {periodo}."
+
+    saldo = entradas - saidas
+    return (
+        f"<b>📊 Resumo de {periodo}</b>\n\n"
+        f"🟢 Entradas: R$ {entradas:.2f}\n"
+        f"🔴 Saídas: R$ {saidas:.2f}\n"
+        f"💰 Saldo: R$ {saldo:.2f}"
+    )

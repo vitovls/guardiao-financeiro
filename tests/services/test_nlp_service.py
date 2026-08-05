@@ -1,6 +1,7 @@
 from datetime import date
 
 from models import Transacao
+from services.llm.provider import InterpretacaoTexto
 
 
 def _fake_transacao() -> Transacao:
@@ -13,31 +14,31 @@ def _fake_transacao() -> Transacao:
     )
 
 
-async def test_extract_text_transactions_returns_provider_result(monkeypatch):
+async def test_interpret_text_returns_provider_result(monkeypatch):
     import services.nlp_service as nlp_service
 
-    expected = [_fake_transacao()]
+    expected = InterpretacaoTexto(intencao="transacao", transacoes=[_fake_transacao()])
 
     class _FakeProvider:
-        async def extract_text_transactions(self, text: str) -> list[Transacao]:
+        async def interpret_text(self, text: str) -> InterpretacaoTexto:
             return expected
 
     monkeypatch.setattr(nlp_service, "_provider", _FakeProvider())
 
-    result = await nlp_service.extract_text_transactions("gastei 30 no mercado")
+    result = await nlp_service.interpret_text("gastei 30 no mercado")
 
     assert result == expected
 
 
-async def test_extract_text_transactions_returns_empty_list_when_provider_raises(monkeypatch):
+async def test_interpret_text_returns_nenhuma_when_provider_raises(monkeypatch):
     import services.nlp_service as nlp_service
 
     class _FailingProvider:
-        async def extract_text_transactions(self, text: str) -> list[Transacao]:
+        async def interpret_text(self, text: str) -> InterpretacaoTexto:
             raise RuntimeError("falha inesperada")
 
     monkeypatch.setattr(nlp_service, "_provider", _FailingProvider())
 
-    result = await nlp_service.extract_text_transactions("gastei 30 no mercado")
+    result = await nlp_service.interpret_text("gastei 30 no mercado")
 
-    assert result == []
+    assert result == InterpretacaoTexto(intencao="nenhuma")

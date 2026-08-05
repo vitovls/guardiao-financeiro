@@ -101,6 +101,52 @@ async def test_get_totals_returns_zeros_when_no_transactions(session_factory):
     assert result == {"entradas": 0.0, "saidas": 0.0}
 
 
+async def test_get_totals_by_period_filters_by_categoria(session_factory):
+    repo = SqliteTransactionRepository(session_factory)
+
+    await repo.save_transactions(
+        [_transacao(tipo="saida", valor=300.0, data=date(2026, 6, 15), descricao="a", categoria="mercado")], 1
+    )
+    await repo.save_transactions(
+        [_transacao(tipo="saida", valor=50.0, data=date(2026, 6, 20), descricao="b", categoria="lazer")], 1
+    )
+
+    result = await repo.get_totals_by_period(1, date(2026, 6, 1), date(2026, 6, 30), categoria="mercado")
+
+    assert result == {"entradas": 0.0, "saidas": 300.0}
+
+
+async def test_get_totals_by_period_categoria_filter_is_normalized(session_factory):
+    repo = SqliteTransactionRepository(session_factory)
+
+    await repo.save_transactions(
+        [_transacao(tipo="saida", valor=100.0, data=date(2026, 6, 15), descricao="a", categoria="Mercado")], 1
+    )
+    await repo.save_transactions(
+        [_transacao(tipo="saida", valor=50.0, data=date(2026, 6, 16), descricao="b", categoria="Alimentação")], 1
+    )
+
+    result = await repo.get_totals_by_period(1, date(2026, 6, 1), date(2026, 6, 30), categoria="mercado")
+    assert result == {"entradas": 0.0, "saidas": 100.0}
+
+    result_acentuada = await repo.get_totals_by_period(
+        1, date(2026, 6, 1), date(2026, 6, 30), categoria="alimentacao"
+    )
+    assert result_acentuada == {"entradas": 0.0, "saidas": 50.0}
+
+
+async def test_get_totals_by_period_categoria_without_match_returns_zeros(session_factory):
+    repo = SqliteTransactionRepository(session_factory)
+
+    await repo.save_transactions(
+        [_transacao(tipo="saida", valor=100.0, data=date(2026, 6, 15), descricao="a", categoria="mercado")], 1
+    )
+
+    result = await repo.get_totals_by_period(1, date(2026, 6, 1), date(2026, 6, 30), categoria="transporte")
+
+    assert result == {"entradas": 0.0, "saidas": 0.0}
+
+
 async def test_find_by_user_returns_stored_transactions(session_factory):
     repo = SqliteTransactionRepository(session_factory)
 
