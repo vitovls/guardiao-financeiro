@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.connection import async_session
@@ -90,22 +90,23 @@ class SqliteTransactionRepository(TransactionRepository):
             return [_to_transacao(e) for e in result.scalars().all()]
 
     async def get_totals_by_period(
-        self, telegram_user_id: int, start: date, end: date
+        self, telegram_user_id: int, start: date, end: date, categoria: str | None = None
     ) -> dict[str, float]:
+        categoria_norm = normalize_description(categoria) if categoria else None
         async with self._session_factory() as session:
             result = await session.execute(
-                select(TransactionEntity.tipo, func.sum(TransactionEntity.valor))
-                .where(
+                select(TransactionEntity).where(
                     TransactionEntity.telegram_user_id == telegram_user_id,
                     TransactionEntity.data >= start,
                     TransactionEntity.data <= end,
                 )
-                .group_by(TransactionEntity.tipo)
             )
             key_map = {"entrada": "entradas", "saida": "saidas"}
             totals = {"entradas": 0.0, "saidas": 0.0}
-            for tipo, total in result.all():
-                key = key_map.get(tipo)
+            for entity in result.scalars().all():
+                if categoria_norm and normalize_description(entity.categoria) != categoria_norm:
+                    continue
+                key = key_map.get(entity.tipo)
                 if key:
-                    totals[key] = total or 0.0
+                    totals[key] += entity.valor
             return totals

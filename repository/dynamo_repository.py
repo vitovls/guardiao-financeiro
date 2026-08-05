@@ -271,7 +271,7 @@ class DynamoTransactionRepository(TransactionRepository):
         ]
 
     async def get_totals_by_period(
-        self, telegram_user_id: int, start: date, end: date
+        self, telegram_user_id: int, start: date, end: date, categoria: str | None = None
     ) -> dict[str, float]:
         try:
             response = self._table.query(
@@ -283,10 +283,13 @@ class DynamoTransactionRepository(TransactionRepository):
         except ClientError as exc:
             raise RepositoryError(f"falha ao consultar totais por período: {exc}") from exc
 
+        categoria_norm = normalize_description(categoria) if categoria else None
         totals = {"entradas": 0.0, "saidas": 0.0}
         key_map = {"entrada": "entradas", "saida": "saidas"}
         for item in response.get("Items", []):
             if item["sortKey"].startswith(_ESPECIAIS):
+                continue
+            if categoria_norm and normalize_description(item.get("categoria", "")) != categoria_norm:
                 continue
             key = key_map.get(item.get("tipo"))
             if key:

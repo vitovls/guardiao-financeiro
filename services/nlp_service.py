@@ -1,14 +1,14 @@
 import sys
 
-from models import Transacao
 from services.llm.factory import get_llm_provider
+from services.llm.provider import InterpretacaoTexto
 
 _provider = get_llm_provider()
 
 
-async def extract_text_transactions(text: str) -> list[Transacao]:
+async def interpret_text(text: str) -> InterpretacaoTexto:
     try:
-        return await _provider.extract_text_transactions(text)
+        return await _provider.interpret_text(text)
     except Exception as exc:
-        print(f"[nlp_service] falha ao extrair transação de texto: {exc}", file=sys.stderr)
-        return []
+        print(f"[nlp_service] falha ao interpretar mensagem de texto: {exc}", file=sys.stderr)
+        return InterpretacaoTexto(intencao="nenhuma")

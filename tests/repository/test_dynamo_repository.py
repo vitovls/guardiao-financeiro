@@ -187,6 +187,59 @@ async def test_get_totals_by_period_sums_excludes_config_and_uses_sentinel():
     assert high == f"2026-06-30#{_HIGH_SENTINEL}"
 
 
+async def test_get_totals_by_period_filters_by_categoria():
+    resource, table = Mock(), Mock()
+    resource.Table.return_value = table
+    table.query.return_value = {
+        "Items": [
+            {"sortKey": "2026-06-10#aaa", "tipo": "entrada", "valor": 1000.0, "categoria": "mercado"},
+            {"sortKey": "2026-06-15#bbb", "tipo": "saida", "valor": 300.0, "categoria": "mercado"},
+            {"sortKey": "2026-06-20#ccc", "tipo": "saida", "valor": 50.0, "categoria": "lazer"},
+        ]
+    }
+
+    repo = DynamoTransactionRepository(table_name="tbl", resource=resource)
+    result = await repo.get_totals_by_period(1, date(2026, 6, 1), date(2026, 6, 30), categoria="mercado")
+
+    assert result == {"entradas": 1000.0, "saidas": 300.0}
+
+
+async def test_get_totals_by_period_categoria_filter_is_normalized():
+    resource, table = Mock(), Mock()
+    resource.Table.return_value = table
+    table.query.return_value = {
+        "Items": [
+            {"sortKey": "2026-06-10#aaa", "tipo": "saida", "valor": 100.0, "categoria": "Mercado"},
+            {"sortKey": "2026-06-15#bbb", "tipo": "saida", "valor": 50.0, "categoria": "Alimentação"},
+        ]
+    }
+
+    repo = DynamoTransactionRepository(table_name="tbl", resource=resource)
+    result = await repo.get_totals_by_period(1, date(2026, 6, 1), date(2026, 6, 30), categoria="mercado")
+
+    assert result == {"entradas": 0.0, "saidas": 100.0}
+
+    result_acentuada = await repo.get_totals_by_period(
+        1, date(2026, 6, 1), date(2026, 6, 30), categoria="alimentacao"
+    )
+    assert result_acentuada == {"entradas": 0.0, "saidas": 50.0}
+
+
+async def test_get_totals_by_period_categoria_without_match_returns_zeros():
+    resource, table = Mock(), Mock()
+    resource.Table.return_value = table
+    table.query.return_value = {
+        "Items": [
+            {"sortKey": "2026-06-10#aaa", "tipo": "saida", "valor": 100.0, "categoria": "mercado"},
+        ]
+    }
+
+    repo = DynamoTransactionRepository(table_name="tbl", resource=resource)
+    result = await repo.get_totals_by_period(1, date(2026, 6, 1), date(2026, 6, 30), categoria="transporte")
+
+    assert result == {"entradas": 0.0, "saidas": 0.0}
+
+
 def _pend_item(
     pendencia_id: str,
     t: Transacao,

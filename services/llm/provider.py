@@ -1,4 +1,8 @@
 from abc import ABC, abstractmethod
+from datetime import date
+from typing import Literal
+
+from pydantic import BaseModel
 
 from models import Transacao
 
@@ -11,9 +15,17 @@ class BedrockOutputError(LLMProviderError):
     """Bedrock retornou JSON inválido/vazio mesmo após a re-tentativa de output malformado."""
 
 
+class InterpretacaoTexto(BaseModel):
+    intencao: Literal["transacao", "consulta", "nenhuma"]
+    transacoes: list[Transacao] = []
+    periodo_inicio: date | None = None
+    periodo_fim: date | None = None
+    categoria: str | None = None
+
+
 class LLMProvider(ABC):
     @abstractmethod
-    async def extract_text_transactions(self, text: str) -> list[Transacao]:
+    async def interpret_text(self, text: str) -> InterpretacaoTexto:
         ...
 
     @abstractmethod

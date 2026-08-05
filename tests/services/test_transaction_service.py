@@ -34,8 +34,20 @@ async def test_get_totals_delegates_to_repository_and_returns_result(monkeypatch
     start, end = date(2026, 6, 1), date(2026, 6, 30)
     result = await transaction_service.get_totals(42, start, end)
 
-    repository.get_totals_by_period.assert_awaited_once_with(42, start, end)
+    repository.get_totals_by_period.assert_awaited_once_with(42, start, end, None)
     assert result == {"entradas": 1.0, "saidas": 2.0}
+
+
+async def test_get_totals_passes_categoria_to_repository(monkeypatch):
+    repository = AsyncMock()
+    repository.get_totals_by_period.return_value = {"entradas": 0.0, "saidas": 320.0}
+    monkeypatch.setattr(transaction_service, "get_transaction_repository", lambda: repository)
+
+    start, end = date(2026, 6, 1), date(2026, 6, 30)
+    result = await transaction_service.get_totals(42, start, end, categoria="mercado")
+
+    repository.get_totals_by_period.assert_awaited_once_with(42, start, end, "mercado")
+    assert result == {"entradas": 0.0, "saidas": 320.0}
 
 
 async def test_get_pending_delegates_to_repository_and_returns_result(monkeypatch):

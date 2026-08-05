@@ -48,5 +48,5 @@ class TransactionRepository(ABC):
 
     @abstractmethod
     async def get_totals_by_period(
-        self, telegram_user_id: int, start: date, end: date
+        self, telegram_user_id: int, start: date, end: date, categoria: str | None = None
     ) -> dict[str, float]: ...

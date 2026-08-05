@@ -19,7 +19,7 @@ class _ConcreteRepository(TransactionRepository):
     async def find_by_user(self, telegram_user_id):
         return []
 
-    async def get_totals_by_period(self, telegram_user_id, start, end):
+    async def get_totals_by_period(self, telegram_user_id, start, end, categoria=None):
         return {}
 
 
